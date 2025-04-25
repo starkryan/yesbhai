@@ -1,69 +1,88 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { Head } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { RealOtpStats } from '@/components/real-otp-stats';
+import { RealOtpServices } from '@/components/real-otp-services';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard',
+        title: 'Home',
         href: '/dashboard',
     },
 ];
 
 export default function Dashboard() {
-    const { success, error, info, warning, promise } = useToast();
-
-    const handleSuccess = () => success('Operation completed successfully');
-    const handleError = () => error('Something went wrong!');
-    const handleInfo = () => info('Here is some information for you');
-    const handleWarning = () => warning('Be careful with this action');
-    
-    const handlePromise = () => {
-        const fakeFetch = new Promise((resolve, reject) => {
-            setTimeout(() => {
-                // Random success or failure
-                Math.random() > 0.5 ? resolve({ data: 'Success data' }) : reject(new Error('Failed to fetch'));
-            }, 2000);
-        });
-        
-        promise(fakeFetch, {
-            loading: 'Loading data...',
-            success: (data) => `Data loaded successfully`,
-            error: (err) => `Error: ${err.message}`
-        });
-    };
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <div className="border-sidebar-border/70 dark:border-sidebar-border relative overflow-hidden rounded-xl border p-6">
-                    <h2 className="mb-4 text-xl font-semibold">Toast Notification Examples</h2>
-                    <div className="flex flex-wrap gap-3">
-                        <Button onClick={handleSuccess} variant="default">Success Toast</Button>
-                        <Button onClick={handleError} variant="destructive">Error Toast</Button>
-                        <Button onClick={handleInfo} variant="secondary">Info Toast</Button>
-                        <Button onClick={handleWarning} variant="outline">Warning Toast</Button>
-                        <Button onClick={handlePromise} variant="default">Promise Toast</Button>
-                    </div>
+            <Head title="OTP Services Dashboard" />
+            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-bold tracking-tight">OTP Services Dashboard</h1>
+                    <p className="text-sm text-gray-500">
+                        Browse and manage OTP services from RealOTP
+                    </p>
                 </div>
-            
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                </div>
-                <div className="border-sidebar-border/70 dark:border-sidebar-border relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border md:min-h-min">
-                    <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                </div>
+                
+                <RealOtpStats />
+                
+                <Tabs defaultValue="services" className="w-full">
+                    <TabsList className="mb-4">
+                        <TabsTrigger value="services">
+                            Services
+                        </TabsTrigger>
+                        <TabsTrigger value="recent">
+                            Recent Orders
+                        </TabsTrigger>
+                        <TabsTrigger value="balance">
+                            Balance & History
+                        </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="services" className="mt-0">
+                        <RealOtpServices />
+                    </TabsContent>
+                    
+                    <TabsContent value="recent" className="mt-0">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Recent Orders</CardTitle>
+                                <CardDescription>
+                                    Your recent OTP service purchases
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex items-center justify-center py-8">
+                                <div className="text-center">
+                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                                        <Search className="h-6 w-6 text-gray-500" />
+                                    </div>
+                                    <p className="text-gray-500">No recent orders found</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    
+                    <TabsContent value="balance" className="mt-0">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Balance & History</CardTitle>
+                                <CardDescription>
+                                    Your account balance and transaction history
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex items-center justify-center py-8">
+                                <div className="text-center">
+                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                                        <Search className="h-6 w-6 text-gray-500" />
+                                    </div>
+                                    <p className="text-gray-500">No transaction history available</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </AppLayout>
     );
