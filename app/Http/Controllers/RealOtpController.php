@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Models\OtpPurchase;
 
 class RealOtpController extends Controller
 {
@@ -103,6 +105,7 @@ class RealOtpController extends Controller
         try {
             $serviceCode = $request->query('service_code');
             $serverCode = $request->query('server_code');
+            $serviceName = $request->query('service_name', 'Unknown Service');
             
             if (!$serviceCode || !$serverCode) {
                 return response()->json([
@@ -134,6 +137,23 @@ class RealOtpController extends Controller
                     // Access structure is ACCESS_NUMBER:order_id:phone_number
                     $orderId = $parts[1];
                     $phoneNumber = $parts[2];
+                    
+                    // Get the price for this service
+                    $price = $this->getServicePrice($serviceCode, $serverCode);
+                    
+                    // Save the purchase in database if user is logged in
+                    if (Auth::check()) {
+                        OtpPurchase::create([
+                            'user_id' => Auth::id(),
+                            'order_id' => $orderId,
+                            'phone_number' => $phoneNumber,
+                            'service_name' => $serviceName,
+                            'service_code' => $serviceCode,
+                            'server_code' => $serverCode,
+                            'price' => $price,
+                            'status' => 'waiting',
+                        ]);
+                    }
                     
                     return response()->json([
                         'success' => true,
@@ -201,6 +221,22 @@ class RealOtpController extends Controller
             // The API might return: STATUS_OK:verification_code
             if (str_starts_with($responseBody, 'STATUS_OK:')) {
                 $code = substr($responseBody, strlen('STATUS_OK:'));
+                
+                // Update the purchase record if exists
+                if (Auth::check()) {
+                    $purchase = OtpPurchase::where('order_id', $orderId)
+                        ->where('user_id', Auth::id())
+                        ->first();
+                    
+                    if ($purchase) {
+                        $purchase->update([
+                            'verification_code' => $code,
+                            'status' => 'completed',
+                            'verification_received_at' => now(),
+                        ]);
+                    }
+                }
+                
                 return response()->json([
                     'success' => true,
                     'status' => 'completed',
@@ -220,6 +256,20 @@ class RealOtpController extends Controller
             
             // Handle NO_ACTIVATION error explicitly with a clearer message
             if ($responseBody === 'NO_ACTIVATION') {
+                // Update the purchase record as expired if it exists
+                if (Auth::check()) {
+                    $purchase = OtpPurchase::where('order_id', $orderId)
+                        ->where('user_id', Auth::id())
+                        ->first();
+                    
+                    if ($purchase && $purchase->status === 'waiting') {
+                        $purchase->update([
+                            'status' => 'expired',
+                            'expired_at' => now(),
+                        ]);
+                    }
+                }
+                
                 return response()->json([
                     'success' => false,
                     'message' => 'No active number found for this order ID. The number might have expired or been cancelled.',
@@ -274,6 +324,20 @@ class RealOtpController extends Controller
             
             // Check for success response
             if ($responseBody === 'ACCESS_CANCEL' || $responseBody === 'SUCCESS_CANCEL') {
+                // Update the purchase record if exists
+                if (Auth::check()) {
+                    $purchase = OtpPurchase::where('order_id', $orderId)
+                        ->where('user_id', Auth::id())
+                        ->first();
+                    
+                    if ($purchase) {
+                        $purchase->update([
+                            'status' => 'cancelled',
+                            'cancelled_at' => now(),
+                        ]);
+                    }
+                }
+                
                 return response()->json([
                     'success' => true,
                     'message' => 'Number cancelled successfully',
@@ -296,7 +360,6 @@ class RealOtpController extends Controller
                 'message' => $responseBody,
                 'raw_response' => $responseBody,
             ], 400);
-            
         } catch (\Exception $e) {
             Log::error('RealOTP cancelNumber error: ' . $e->getMessage());
             return response()->json([
@@ -457,5 +520,61 @@ class RealOtpController extends Controller
                 ]
             ]
         ];
+    }
+
+    /**
+     * Get price for a specific service and server
+     */
+    protected function getServicePrice($serviceCode, $serverCode)
+    {
+        $services = null;
+        
+        // First try to get from cache
+        if (Cache::has('realotp_services')) {
+            $services = Cache::get('realotp_services');
+        }
+        
+        // If not in cache or cache is empty, get from fallback
+        if (!$services && file_exists(storage_path('app/realotp_fallback.json'))) {
+            $services = json_decode(file_get_contents(storage_path('app/realotp_fallback.json')), true);
+        }
+        
+        // If still nothing, use sample data
+        if (!$services) {
+            $services = $this->getSampleData();
+        }
+        
+        // Search for the price
+        foreach ($services as $serviceName => $serviceItems) {
+            foreach ($serviceItems as $item) {
+                if ($item['service_code'] === $serviceCode && $item['server_code'] === $serverCode) {
+                    return $item['price'];
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get user's OTP purchases
+     */
+    public function getUserPurchases()
+    {
+        if (!Auth::check()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+        
+        $purchases = OtpPurchase::where('user_id', Auth::id())
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+            
+        return response()->json([
+            'success' => true,
+            'data' => $purchases,
+        ]);
     }
 } 

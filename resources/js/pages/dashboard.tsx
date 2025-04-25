@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { RealOtpServices } from '@/components/real-otp-services';
+import { UserOtpPurchases } from '@/components/user-otp-purchases';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search } from 'lucide-react';
@@ -45,22 +46,7 @@ export default function Dashboard() {
                     </TabsContent>
                     
                     <TabsContent value="recent" className="mt-0">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Recent Orders</CardTitle>
-                                <CardDescription>
-                                    Your recent OTP service purchases
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex items-center justify-center py-8">
-                                <div className="text-center">
-                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                                        <Search className="h-6 w-6 text-gray-500" />
-                                    </div>
-                                    <p className="text-gray-500">No recent orders found</p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <UserOtpPurchases />
                     </TabsContent>
                     
                     <TabsContent value="balance" className="mt-0">

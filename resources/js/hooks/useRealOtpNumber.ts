@@ -3,6 +3,7 @@ import { useState } from 'react';
 interface RequestNumberParams {
   service_code: string;
   server_code: string;
+  service_name?: string;
 }
 
 interface RequestNumberResponse {
@@ -43,7 +44,8 @@ export function useRealOtpNumber() {
       setError(null);
       setStatus('requesting');
       
-      const url = `/api/realotp/number?service_code=${encodeURIComponent(params.service_code)}&server_code=${encodeURIComponent(params.server_code)}`;
+      const serviceNameParam = params.service_name ? `&service_name=${encodeURIComponent(params.service_name)}` : '';
+      const url = `/api/realotp/number?service_code=${encodeURIComponent(params.service_code)}&server_code=${encodeURIComponent(params.server_code)}${serviceNameParam}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {

@@ -49,7 +49,11 @@ export function RealOtpNumberModal({
   // Request the number when modal opens
   useEffect(() => {
     if (open && status === 'idle') {
-      requestNumber({ service_code: serviceCode, server_code: serverCode });
+      requestNumber({ 
+        service_code: serviceCode, 
+        server_code: serverCode,
+        service_name: serviceName
+      });
     }
     
     return () => {
@@ -57,7 +61,7 @@ export function RealOtpNumberModal({
         clearInterval(checkInterval);
       }
     };
-  }, [open, serviceCode, serverCode]);
+  }, [open, serviceCode, serverCode, serviceName]);
   
   // Set up timer for checking status and countdown
   useEffect(() => {
@@ -125,7 +129,11 @@ export function RealOtpNumberModal({
     }
     setRemainingTime(300);
     reset();
-    requestNumber({ service_code: serviceCode, server_code: serverCode });
+    requestNumber({ 
+      service_code: serviceCode, 
+      server_code: serverCode,
+      service_name: serviceName 
+    });
   };
   
   // If we've waited too long for SMS, show timeout error
