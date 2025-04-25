@@ -19,15 +19,11 @@ const mainNavItems: NavItem[] = [
         icon: CreditCard,
     },
     {
-        title: 'Wallet Transactions',
+        title: 'Transactions',
         href: '/wallet-transactions',
         icon: Wallet,
     },
-    {
-        title: 'History',
-        href: '/history',
-        icon: History,
-    },
+  
 ];
 
 

@@ -27,7 +27,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, AlertCircle, Clock, CheckCircle, XCircle, Copy, ExternalLink } from 'lucide-react';
+import { Search, AlertCircle, Clock, CheckCircle, XCircle, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+// import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner'; 
 
 interface OtpPurchase {
   id: number;
@@ -74,6 +84,12 @@ export function UserOtpPurchases() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [copied, setCopied] = useState<{id: number, field: 'phone' | 'code'} | null>(null);
+  
+  // State for cancelling modal
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<OtpPurchase | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+ 
 
   useEffect(() => {
     fetchPurchases(currentPage);
@@ -133,6 +149,49 @@ export function UserOtpPurchases() {
         return <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">Expired</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleCancelClick = (purchase: OtpPurchase) => {
+    setSelectedPurchase(purchase);
+    setCancelModalOpen(true);
+  };
+
+  const cancelOtp = async () => {
+    if (!selectedPurchase) return;
+    
+    setIsCancelling(true);
+    try {
+      const response = await fetch(`/api/realotp/cancel?order_id=${selectedPurchase.order_id}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state
+        setPurchases(purchases.map(p => 
+          p.id === selectedPurchase.id ? { ...p, status: 'cancelled' } : p
+        ));
+        
+        toast.success("OTP Cancelled", {
+          description: "Your OTP number has been successfully cancelled.",
+        });
+      } else {
+        toast.error("Error", {
+          description: data.message || "Failed to cancel OTP. Please try again.",
+        });
+      }
+    } catch (error) {
+      toast.error("Error", {
+        description: "An unexpected error occurred. Please try again.",
+      });
+    } finally {
+      setIsCancelling(false);
+      setCancelModalOpen(false);
     }
   };
 
@@ -197,146 +256,220 @@ export function UserOtpPurchases() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent OTP Purchases</CardTitle>
-        <CardDescription>Your recent OTP service purchases</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Service</TableHead>
-                <TableHead>Phone Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Verification Code</TableHead>
-                <TableHead>Purchased</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {purchases.map((purchase) => (
-                <TableRow key={purchase.id}>
-                  <TableCell className="font-medium">
-                    {purchase.service_name}
-                    <div className="text-xs text-gray-500">
-                      Server: {purchase.server_code}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <span>{purchase.phone_number}</span>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => copyToClipboard(purchase.phone_number, purchase.id, 'phone')}
-                      >
-                        {copied?.id === purchase.id && copied?.field === 'phone' 
-                          ? <CheckCircle className="h-3.5 w-3.5" /> 
-                          : <Copy className="h-3.5 w-3.5" />}
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(purchase.status)}
-                  </TableCell>
-                  <TableCell>
-                    {purchase.verification_code ? (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent OTP Purchases</CardTitle>
+          <CardDescription>Your recent OTP service purchases</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Phone Number</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Verification Code</TableHead>
+                  <TableHead>Purchased</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {purchases.map((purchase) => (
+                  <TableRow key={purchase.id}>
+                    <TableCell className="font-medium">
+                      {purchase.service_name}
+                      <div className="text-xs text-gray-500">
+                        Server: {purchase.server_code}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center space-x-2">
-                        <span className="font-medium">{purchase.verification_code}</span>
+                        <span>{purchase.phone_number}</span>
                         <Button 
                           variant="ghost" 
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => copyToClipboard(purchase.verification_code!, purchase.id, 'code')}
+                          onClick={() => copyToClipboard(purchase.phone_number, purchase.id, 'phone')}
                         >
-                          {copied?.id === purchase.id && copied?.field === 'code' 
+                          {copied?.id === purchase.id && copied?.field === 'phone' 
                             ? <CheckCircle className="h-3.5 w-3.5" /> 
                             : <Copy className="h-3.5 w-3.5" />}
                         </Button>
                       </div>
-                    ) : (
-                      <span className="text-gray-500 text-sm">
-                        {purchase.status === 'waiting' ? 'Waiting for code...' : 'No code received'}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">{formatDate(purchase.created_at)}</div>
-                    {purchase.verification_received_at && (
-                      <div className="text-xs text-gray-500">
-                        Received: {formatDate(purchase.verification_received_at)}
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {pagination && pagination.last_page > 1 && (
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious 
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className={currentPage === 1 ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-                
-                {Array.from({ length: pagination.last_page }).map((_, i) => {
-                  const page = i + 1;
-                  
-                  // Show first page, last page, and pages around current page
-                  if (
-                    page === 1 ||
-                    page === pagination.last_page ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(page)}
-                          isActive={page === currentPage}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(purchase.status)}
+                    </TableCell>
+                    <TableCell>
+                      {purchase.verification_code ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{purchase.verification_code}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => copyToClipboard(purchase.verification_code!, purchase.id, 'code')}
+                          >
+                            {copied?.id === purchase.id && copied?.field === 'code' 
+                              ? <CheckCircle className="h-3.5 w-3.5" /> 
+                              : <Copy className="h-3.5 w-3.5" />}
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 text-sm">
+                          {purchase.status === 'waiting' ? 'Waiting for code...' : 'No code received'}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">{formatDate(purchase.created_at)}</div>
+                      {purchase.verification_received_at && (
+                        <div className="text-xs text-gray-500">
+                          Received: {formatDate(purchase.verification_received_at)}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {purchase.status === 'waiting' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => handleCancelClick(purchase)}
                         >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  }
-                  
-                  // Show ellipsis for page gaps
-                  if (
-                    (page === 2 && currentPage > 3) ||
-                    (page === pagination.last_page - 1 && currentPage < pagination.last_page - 2)
-                  ) {
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    );
-                  }
-                  
-                  return null;
-                })}
-                
-                <PaginationItem>
-                  <PaginationNext 
-                    onClick={() => setCurrentPage(prev => Math.min(pagination.last_page, prev + 1))}
-                    className={currentPage === pagination.last_page ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                          <XCircle className="h-3.5 w-3.5 mr-1" />
+                          Cancel
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
-        )}
-      </CardContent>
-      <CardFooter className="border-t p-4 text-xs text-gray-500">
-        Showing {purchases.length} of {pagination?.total || 0} purchases
-      </CardFooter>
-    </Card>
+
+          {pagination && pagination.last_page > 1 && (
+            <div className="mt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className={currentPage === 1 ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: pagination.last_page }).map((_, i) => {
+                    const page = i + 1;
+                    
+                    // Show first page, last page, and pages around current page
+                    if (
+                      page === 1 ||
+                      page === pagination.last_page ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={page === currentPage}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                    
+                    // Show ellipsis for page gaps
+                    if (
+                      (page === 2 && currentPage > 3) ||
+                      (page === pagination.last_page - 1 && currentPage < pagination.last_page - 2)
+                    ) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+                    
+                    return null;
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(prev => Math.min(pagination.last_page, prev + 1))}
+                      className={currentPage === pagination.last_page ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="border-t p-4 text-xs text-gray-500">
+          Showing {purchases.length} of {pagination?.total || 0} purchases
+        </CardFooter>
+      </Card>
+
+      {/* Cancel Confirmation Dialog */}
+      <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel OTP Number</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this OTP number? Your funds will be returned to your account.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedPurchase && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Service</p>
+                  <p className="text-sm">{selectedPurchase.service_name}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Phone Number</p>
+                  <p className="text-sm">{selectedPurchase.phone_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Order ID</p>
+                  <p className="text-sm font-mono">{selectedPurchase.order_id}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Purchased</p>
+                  <p className="text-sm">{formatDate(selectedPurchase.created_at)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex sm:justify-between">
+            <Button variant="secondary" onClick={() => setCancelModalOpen(false)}>
+              No, Keep It
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={cancelOtp}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Cancel Number
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 } 

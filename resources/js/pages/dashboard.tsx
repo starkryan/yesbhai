@@ -36,9 +36,7 @@ export default function Dashboard() {
                         <TabsTrigger value="recent">
                             Recent Orders
                         </TabsTrigger>
-                        <TabsTrigger value="balance">
-                            Balance & History
-                        </TabsTrigger>
+                       
                     </TabsList>
                     
                     <TabsContent value="services" className="mt-0">
