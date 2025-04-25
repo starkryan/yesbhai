@@ -9,14 +9,6 @@ import {
   CardFooter
 } from '@/components/ui/card';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
   Pagination, 
   PaginationContent, 
   PaginationItem, 
@@ -178,13 +170,10 @@ export function RealOtpServices() {
                       onClick={() => toggleService(serviceName)}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full">
-                          {serviceName.charAt(0).toUpperCase() !== " " ? serviceName.charAt(0).toUpperCase() : "U"}
-                        </div>
                         <span className="font-medium">{serviceName}</span>
-                        <span className="text-xs">({serviceItems.length} Servers)</span>
+                        <span className="text-xs text-gray-500">({serviceItems.length} Servers)</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div>
                         {expandedService === serviceName ? 
                           <ChevronUp className="h-5 w-5" /> : 
                           <ChevronDown className="h-5 w-5" />
@@ -194,25 +183,23 @@ export function RealOtpServices() {
                     
                     {expandedService === serviceName && (
                       <div className="p-4">
-                        <div className="mb-2 grid grid-cols-4 gap-2 text-sm font-medium">
+                        <div className="mb-2 grid grid-cols-3 gap-2 text-sm font-medium">
                           <div>Server</div>
                           <div>Country</div>
-                          <div>Service Code</div>
                           <div className="text-right">Price</div>
                         </div>
                         {serviceItems.length > 0 ? (
                           serviceItems.map((item, index) => (
                             <div 
                               key={`${item.service_code}-${item.server_code}-${index}`}
-                              className="grid grid-cols-4 gap-2 py-2 border-t first:border-t-0 items-center"
+                              className="grid grid-cols-3 gap-2 py-2 border-t first:border-t-0 items-center"
                             >
                               <div className="text-sm font-medium">Server {item.server_code}</div>
                               <div className="flex items-center gap-1 text-sm">
-                                <span className="inline-block">🇮🇳</span> India
+                                <span className="inline-block">🇮🇳</span>India
                               </div>
-                              <div className="text-sm">{item.service_code}</div>
                               <div className="flex items-center justify-end gap-3">
-                                <span className="font-medium">₹ {item.price}</span>
+                                <span className="font-medium">₹{item.price}</span>
                                 <Button 
                                   size="sm" 
                                   variant="outline" 

@@ -1,7 +1,6 @@
 import { Head } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { RealOtpStats } from '@/components/real-otp-stats';
 import { RealOtpServices } from '@/components/real-otp-services';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,7 +25,7 @@ export default function Dashboard() {
                     </p>
                 </div>
                 
-                <RealOtpStats />
+                
                 
                 <Tabs defaultValue="services" className="w-full">
                     <TabsList className="mb-4">
