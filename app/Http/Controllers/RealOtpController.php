@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Models\OtpPurchase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 
 class RealOtpController extends Controller
 {
@@ -114,6 +118,37 @@ class RealOtpController extends Controller
                 ], 400);
             }
             
+            // Get the price for this service
+            $price = $this->getServicePrice($serviceCode, $serverCode);
+            
+            // Verify user authentication
+            if (!Auth::check()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated',
+                ], 401);
+            }
+            
+            $user = Auth::user();
+            
+            // Check if price is set
+            if (!$price) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to determine price for this service',
+                ], 400);
+            }
+            
+            // Check user balance
+            if (!$user->hasSufficientBalance((float)$price)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient wallet balance. Please recharge your wallet.',
+                    'current_balance' => $user->available_balance,
+                    'required_price' => $price,
+                ], 403);
+            }
+            
             $apiKey = env('REAL_OTP_API_SECRET');
             $apiUrl = env('REAL_OTP_API_URL');
             
@@ -138,13 +173,16 @@ class RealOtpController extends Controller
                     $orderId = $parts[1];
                     $phoneNumber = $parts[2];
                     
-                    // Get the price for this service
-                    $price = $this->getServicePrice($serviceCode, $serverCode);
+                    // Begin database transaction
+                    DB::beginTransaction();
                     
-                    // Save the purchase in database if user is logged in
-                    if (Auth::check()) {
-                        OtpPurchase::create([
-                            'user_id' => Auth::id(),
+                    try {
+                        // Place a hold on the user's wallet instead of immediately deducting
+                        // We'll only finalize the transaction when the OTP is received
+                        
+                        // Save the purchase in database
+                        $otpPurchase = OtpPurchase::create([
+                            'user_id' => $user->id,
                             'order_id' => $orderId,
                             'phone_number' => $phoneNumber,
                             'service_name' => $serviceName,
@@ -153,12 +191,55 @@ class RealOtpController extends Controller
                             'price' => $price,
                             'status' => 'waiting',
                         ]);
+                        
+                        // Create a wallet transaction record with 'pending' status
+                        \App\Models\WalletTransaction::create([
+                            'user_id' => $user->id,
+                            'amount' => -1 * (float)$price,
+                            'transaction_type' => 'purchase',
+                            'description' => "OTP purchase: {$serviceName} (#{$orderId})",
+                            'reference_id' => $orderId,
+                            'status' => 'pending', // We'll update this to 'completed' when OTP received
+                            'metadata' => json_encode([
+                                'service_code' => $serviceCode,
+                                'server_code' => $serverCode,
+                                'phone_number' => $phoneNumber,
+                            ]),
+                        ]);
+                        
+                        // Place a temporary hold on the user's wallet balance by creating a reserved_balance field
+                        // This prevents users from double-spending their balance while waiting for OTPs
+                        if (!Schema::hasColumn('users', 'reserved_balance')) {
+                            // This will only execute once for the first user after deployment
+                            Schema::table('users', function (Blueprint $table) {
+                                $table->decimal('reserved_balance', 10, 2)->default(0.00)->after('wallet_balance');
+                            });
+                        }
+                        
+                        // Reserve the amount from user's balance
+                        $user->reserved_balance = $user->reserved_balance + (float)$price;
+                        $user->save();
+                        
+                        // Commit transaction if everything is successful
+                        DB::commit();
+                        
+                    } catch (\Exception $e) {
+                        // Roll back transaction if there's any error
+                        DB::rollBack();
+                        Log::error('Transaction error: ' . $e->getMessage());
+                        
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Failed to process transaction: ' . $e->getMessage(),
+                        ], 500);
                     }
                     
                     return response()->json([
                         'success' => true,
                         'phone_number' => $phoneNumber,
                         'order_id' => $orderId,
+                        'price' => $price,
+                        'wallet_balance' => $user->wallet_balance,
                         'raw_response' => $responseBody,
                     ]);
                 }
@@ -224,16 +305,46 @@ class RealOtpController extends Controller
                 
                 // Update the purchase record if exists
                 if (Auth::check()) {
-                    $purchase = OtpPurchase::where('order_id', $orderId)
-                        ->where('user_id', Auth::id())
-                        ->first();
+                    DB::beginTransaction();
                     
-                    if ($purchase) {
-                        $purchase->update([
-                            'verification_code' => $code,
-                            'status' => 'completed',
-                            'verification_received_at' => now(),
-                        ]);
+                    try {
+                        $user = Auth::user();
+                        $purchase = OtpPurchase::where('order_id', $orderId)
+                            ->where('user_id', $user->id)
+                            ->first();
+                        
+                        if ($purchase && $purchase->status === 'waiting') {
+                            // Update purchase record
+                            $purchase->update([
+                                'verification_code' => $code,
+                                'status' => 'completed',
+                                'verification_received_at' => now(),
+                            ]);
+                            
+                            // Get the pending transaction for this order
+                            $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
+                                ->where('user_id', $user->id)
+                                ->where('status', 'pending')
+                                ->first();
+                                
+                            if ($transaction) {
+                                // Finalize the transaction
+                                $transaction->update([
+                                    'status' => 'completed',
+                                ]);
+                                
+                                // Now actually deduct from wallet balance
+                                $price = abs($transaction->amount);
+                                $user->wallet_balance -= $price;
+                                $user->reserved_balance -= $price;
+                                $user->save();
+                            }
+                            
+                            DB::commit();
+                        }
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        Log::error('Error processing OTP verification: ' . $e->getMessage());
                     }
                 }
                 
@@ -258,15 +369,58 @@ class RealOtpController extends Controller
             if ($responseBody === 'NO_ACTIVATION') {
                 // Update the purchase record as expired if it exists
                 if (Auth::check()) {
-                    $purchase = OtpPurchase::where('order_id', $orderId)
-                        ->where('user_id', Auth::id())
-                        ->first();
+                    DB::beginTransaction();
                     
-                    if ($purchase && $purchase->status === 'waiting') {
-                        $purchase->update([
-                            'status' => 'expired',
-                            'expired_at' => now(),
-                        ]);
+                    try {
+                        $user = Auth::user();
+                        $purchase = OtpPurchase::where('order_id', $orderId)
+                            ->where('user_id', $user->id)
+                            ->first();
+                        
+                        if ($purchase && $purchase->status === 'waiting') {
+                            // Update purchase record
+                            $purchase->update([
+                                'status' => 'expired',
+                                'expired_at' => now(),
+                            ]);
+                            
+                            // Get the pending transaction for this order
+                            $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
+                                ->where('user_id', $user->id)
+                                ->where('status', 'pending')
+                                ->first();
+                                
+                            if ($transaction) {
+                                // Mark transaction as cancelled
+                                $transaction->update([
+                                    'status' => 'cancelled',
+                                ]);
+                                
+                                // Release the reserved balance
+                                $price = abs($transaction->amount);
+                                $user->reserved_balance -= $price;
+                                $user->save();
+                                
+                                // Create a refund record
+                                \App\Models\WalletTransaction::create([
+                                    'user_id' => $user->id,
+                                    'amount' => $price, // Positive amount for refund
+                                    'transaction_type' => 'refund',
+                                    'description' => "Refund for expired OTP: {$purchase->service_name} (#{$orderId})",
+                                    'reference_id' => $orderId,
+                                    'status' => 'completed',
+                                    'metadata' => json_encode([
+                                        'original_transaction_id' => $transaction->id,
+                                        'reason' => 'OTP expired'
+                                    ]),
+                                ]);
+                            }
+                            
+                            DB::commit();
+                        }
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        Log::error('Error processing OTP expiration: ' . $e->getMessage());
                     }
                 }
                 
@@ -326,15 +480,58 @@ class RealOtpController extends Controller
             if ($responseBody === 'ACCESS_CANCEL' || $responseBody === 'SUCCESS_CANCEL') {
                 // Update the purchase record if exists
                 if (Auth::check()) {
-                    $purchase = OtpPurchase::where('order_id', $orderId)
-                        ->where('user_id', Auth::id())
-                        ->first();
+                    DB::beginTransaction();
                     
-                    if ($purchase) {
-                        $purchase->update([
-                            'status' => 'cancelled',
-                            'cancelled_at' => now(),
-                        ]);
+                    try {
+                        $user = Auth::user();
+                        $purchase = OtpPurchase::where('order_id', $orderId)
+                            ->where('user_id', $user->id)
+                            ->first();
+                        
+                        if ($purchase && $purchase->status === 'waiting') {
+                            // Update purchase record
+                            $purchase->update([
+                                'status' => 'cancelled',
+                                'cancelled_at' => now(),
+                            ]);
+                            
+                            // Get the pending transaction for this order
+                            $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
+                                ->where('user_id', $user->id)
+                                ->where('status', 'pending')
+                                ->first();
+                                
+                            if ($transaction) {
+                                // Mark transaction as cancelled
+                                $transaction->update([
+                                    'status' => 'cancelled',
+                                ]);
+                                
+                                // Release the reserved balance
+                                $price = abs($transaction->amount);
+                                $user->reserved_balance -= $price;
+                                $user->save();
+                                
+                                // Create a refund record
+                                \App\Models\WalletTransaction::create([
+                                    'user_id' => $user->id,
+                                    'amount' => $price, // Positive amount for refund
+                                    'transaction_type' => 'refund',
+                                    'description' => "Refund for cancelled OTP: {$purchase->service_name} (#{$orderId})",
+                                    'reference_id' => $orderId,
+                                    'status' => 'completed',
+                                    'metadata' => json_encode([
+                                        'original_transaction_id' => $transaction->id,
+                                        'reason' => 'User cancelled'
+                                    ]),
+                                ]);
+                            }
+                            
+                            DB::commit();
+                        }
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        Log::error('Error processing OTP cancellation: ' . $e->getMessage());
                     }
                 }
                 

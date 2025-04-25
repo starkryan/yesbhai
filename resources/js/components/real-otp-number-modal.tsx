@@ -45,6 +45,7 @@ export function RealOtpNumberModal({
   const [remainingTime, setRemainingTime] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState<'phone' | 'code' | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [insufficientBalance, setInsufficientBalance] = useState<{current: string, required: string} | null>(null);
   
   // Request the number when modal opens
   useEffect(() => {
@@ -53,6 +54,22 @@ export function RealOtpNumberModal({
         service_code: serviceCode, 
         server_code: serverCode,
         service_name: serviceName
+      }).then(result => {
+        if (!result.success && result.error?.includes('Insufficient wallet balance')) {
+          try {
+            // Try to extract the balance details from error message
+            const errorData = JSON.parse(result.error);
+            if (errorData.current_balance !== undefined && errorData.required_price !== undefined) {
+              setInsufficientBalance({
+                current: errorData.current_balance,
+                required: errorData.required_price
+              });
+            }
+          } catch (e) {
+            // If we can't parse the error, just set the standard error message
+            // It will be handled by the error state in the hook
+          }
+        }
       });
     }
     
@@ -234,6 +251,34 @@ export function RealOtpNumberModal({
                 <p className="text-sm mt-1">
                   You have successfully cancelled this phone number.
                 </p>
+              </div>
+            </div>
+          )}
+          
+          {error && error.includes('Insufficient wallet balance') && (
+            <div className="rounded-md p-4 flex items-start bg-red-50 border border-red-200">
+              <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0 text-red-500" />
+              <div>
+                <p className="font-medium text-red-700">Insufficient Balance</p>
+                <p className="text-sm mt-1 text-red-600">
+                  You don't have enough balance to purchase this number.
+                  {insufficientBalance && (
+                    <>
+                      <br />
+                      Available Balance: ₹{insufficientBalance.current}
+                      <br />
+                      Required Amount: ₹{insufficientBalance.required}
+                    </>
+                  )}
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="mt-3 border-red-200 hover:bg-red-100 hover:text-red-700"
+                  asChild
+                >
+                  <a href="/recharge">Recharge Wallet</a>
+                </Button>
               </div>
             </div>
           )}

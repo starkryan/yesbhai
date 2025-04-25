@@ -12,6 +12,10 @@ interface RequestNumberResponse {
   order_id?: string;
   message?: string;
   raw_response?: string;
+  current_balance?: string;
+  required_price?: string;
+  price?: string;
+  wallet_balance?: string;
 }
 
 interface CheckStatusResponse {
@@ -65,7 +69,17 @@ export function useRealOtpNumber() {
           order_id: data.order_id
         };
       } else {
-        const errorMessage = data.message || 'Failed to request number';
+        let errorMessage = data.message || 'Failed to request number';
+        
+        // Special handling for insufficient balance
+        if (response.status === 403 && data.message && data.message.includes('Insufficient wallet balance')) {
+          errorMessage = JSON.stringify({
+            message: data.message,
+            current_balance: data.current_balance,
+            required_price: data.required_price
+          });
+        }
+        
         setError(errorMessage);
         setStatus('failed');
         return {

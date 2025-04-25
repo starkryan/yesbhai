@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'wallet_balance',
+        'reserved_balance',
         'password',
     ];
 
@@ -45,6 +46,54 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'wallet_balance' => 'decimal:2',
+            'reserved_balance' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Get the wallet transactions for the user.
+     */
+    public function walletTransactions()
+    {
+        return $this->hasMany(WalletTransaction::class);
+    }
+
+    /**
+     * Get the OTP purchases for the user.
+     */
+    public function otpPurchases()
+    {
+        return $this->hasMany(OtpPurchase::class);
+    }
+    
+    /**
+     * Get the recharges for the user.
+     */
+    public function recharges()
+    {
+        return $this->hasMany(Recharge::class);
+    }
+
+    /**
+     * Check if user has sufficient balance for a purchase.
+     *
+     * @param float $amount
+     * @return bool
+     */
+    public function hasSufficientBalance(float $amount): bool
+    {
+        // Consider both actual balance and any reserved amounts
+        $availableBalance = $this->wallet_balance - $this->reserved_balance;
+        return $availableBalance >= $amount;
+    }
+
+    /**
+     * Get available balance after deducting reserved amounts.
+     *
+     * @return float
+     */
+    public function getAvailableBalanceAttribute(): float
+    {
+        return (float)$this->wallet_balance - (float)$this->reserved_balance;
     }
 }

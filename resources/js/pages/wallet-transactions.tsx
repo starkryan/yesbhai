@@ -23,13 +23,15 @@ import { Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Wallet } from 'lucide-react';
+import { Wallet, Clock, WalletCards } from 'lucide-react';
 
 interface Transaction {
-  id: number;
+  id: number | string;
   order_id: string;
   amount: string;
   status: string;
+  transaction_type: string;
+  description: string;
   transaction_id: string | null;
   created_at: string;
 }
@@ -50,6 +52,8 @@ export default function WalletTransactions() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [walletBalance, setWalletBalance] = useState<string>('0.00');
+  const [availableBalance, setAvailableBalance] = useState<string>('0.00');
+  const [reservedBalance, setReservedBalance] = useState<string>('0.00');
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -58,6 +62,8 @@ export default function WalletTransactions() {
         const response = await axios.get('/api/wallet/transactions');
         setTransactions(response.data.transactions);
         setWalletBalance(response.data.wallet_balance || '0.00');
+        setAvailableBalance(response.data.available_balance || response.data.wallet_balance || '0.00');
+        setReservedBalance(response.data.reserved_balance || '0.00');
         setError(null);
       } catch (err) {
         setError('Failed to load transaction history. Please try again.');
@@ -89,8 +95,29 @@ export default function WalletTransactions() {
         return <Badge variant="outline">Pending</Badge>;
       case 'FAILED':
         return <Badge variant="destructive">Failed</Badge>;
+      case 'CANCELLED':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Cancelled</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const getTransactionTypeBadge = (type: string, amount: string) => {
+    const isDebit = parseFloat(amount) < 0;
+    
+    switch (type) {
+      case 'recharge':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Recharge</Badge>;
+      case 'purchase':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Purchase</Badge>;
+      case 'refund':
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Refund</Badge>;
+      case 'adjustment':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Adjustment</Badge>;
+      default:
+        return isDebit 
+          ? <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Debit</Badge>
+          : <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Credit</Badge>;
     }
   };
 
@@ -106,10 +133,10 @@ export default function WalletTransactions() {
         </div>
         
         {/* Wallet Balance Card */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-3">
           <Card className="md:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Wallet Balance</CardTitle>
+              <CardTitle className="text-base">Available Balance</CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -123,8 +150,8 @@ export default function WalletTransactions() {
                     <Wallet className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">₹{walletBalance}</p>
-                    <p className="text-xs text-gray-500">Available Balance</p>
+                    <p className="text-2xl font-bold">₹{availableBalance}</p>
+                    <p className="text-xs text-gray-500">Available to spend</p>
                   </div>
                 </div>
               )}
@@ -134,6 +161,54 @@ export default function WalletTransactions() {
                 <Link href="/recharge">Recharge Wallet</Link>
               </Button>
             </CardFooter>
+          </Card>
+          
+          <Card className="md:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Reserved Balance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
+                    <Clock className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">₹{reservedBalance}</p>
+                    <p className="text-xs text-gray-500">Reserved for pending OTPs</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          <Card className="md:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Total Balance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                    <WalletCards className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">₹{walletBalance}</p>
+                    <p className="text-xs text-gray-500">Total wallet balance</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
         
@@ -159,22 +234,26 @@ export default function WalletTransactions() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Order ID</TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Order ID</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {transactions.map((transaction) => (
                       <TableRow key={transaction.id}>
                         <TableCell>{formatDate(transaction.created_at)}</TableCell>
-                        <TableCell className="font-mono text-xs">{transaction.order_id}</TableCell>
-                        <TableCell className="font-medium">₹{transaction.amount}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {transaction.transaction_id || '-'}
+                        <TableCell>{transaction.description}</TableCell>
+                        <TableCell className={`font-medium ${parseFloat(transaction.amount) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          ₹{parseFloat(transaction.amount) < 0 
+                              ? Math.abs(parseFloat(transaction.amount)).toFixed(2) 
+                              : transaction.amount}
                         </TableCell>
+                        <TableCell>{getTransactionTypeBadge(transaction.transaction_type, transaction.amount)}</TableCell>
                         <TableCell>{getStatusBadge(transaction.status)}</TableCell>
+                        <TableCell className="font-mono text-xs">{transaction.order_id}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
