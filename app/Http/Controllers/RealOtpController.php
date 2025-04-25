@@ -244,6 +244,69 @@ class RealOtpController extends Controller
     }
     
     /**
+     * Cancel a phone number activation
+     */
+    public function cancelNumber(Request $request)
+    {
+        try {
+            $orderId = $request->query('order_id');
+            
+            if (!$orderId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Missing required parameter: order_id is required',
+                ], 400);
+            }
+            
+            $apiKey = env('REAL_OTP_API_SECRET');
+            $apiUrl = env('REAL_OTP_API_URL');
+            
+            $response = Http::timeout(20)->get($apiUrl, [
+                'api_key' => $apiKey,
+                'action' => 'setStatus',
+                'status' => '8', // Status code 8 for cancel
+                'id' => $orderId,
+            ]);
+            
+            Log::info('RealOTP cancelNumber response: ' . $response->body());
+            
+            $responseBody = $response->body();
+            
+            // Check for success response
+            if ($responseBody === 'ACCESS_CANCEL' || $responseBody === 'SUCCESS_CANCEL') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Number cancelled successfully',
+                    'raw_response' => $responseBody,
+                ]);
+            }
+            
+            // Handle NO_ACTIVATION error explicitly with a clearer message
+            if ($responseBody === 'NO_ACTIVATION') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active number found for this order ID. The number might have already expired or been cancelled.',
+                    'raw_response' => $responseBody,
+                ], 400);
+            }
+            
+            // Handle other error responses
+            return response()->json([
+                'success' => false,
+                'message' => $responseBody,
+                'raw_response' => $responseBody,
+            ], 400);
+            
+        } catch (\Exception $e) {
+            Log::error('RealOTP cancelNumber error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
      * Dashboard with RealOTP services data
      */
     public function dashboard()

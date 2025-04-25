@@ -21,13 +21,21 @@ interface CheckStatusResponse {
   raw_response?: string;
 }
 
+interface CancelNumberResponse {
+  success: boolean;
+  message?: string;
+  raw_response?: string;
+}
+
 export function useRealOtpNumber() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'requesting' | 'waiting' | 'completed' | 'failed'>('idle');
+  const [status, setStatus] = useState<'idle' | 'requesting' | 'waiting' | 'completed' | 'failed' | 'cancelled'>('idle');
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   const requestNumber = async (params: RequestNumberParams) => {
     try {
@@ -79,7 +87,6 @@ export function useRealOtpNumber() {
   const checkStatus = async (orderId: string) => {
     try {
       setIsLoading(true);
-      setError(null);
       
       const url = `/api/realotp/status?order_id=${encodeURIComponent(orderId)}`;
       const response = await fetch(url, {
@@ -90,6 +97,10 @@ export function useRealOtpNumber() {
       });
       
       const data: CheckStatusResponse = await response.json();
+      
+      // Reset retry count on successful response
+      setRetryCount(0);
+      setError(null);
       
       if (data.success) {
         if (data.status === 'completed' && data.verification_code) {
@@ -116,6 +127,55 @@ export function useRealOtpNumber() {
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error checking status';
+      
+      // Only show the error if we've exceeded max retries
+      if (retryCount >= MAX_RETRIES) {
+        setError(errorMessage);
+      }
+      
+      // Increment retry count on error
+      setRetryCount(prev => prev + 1);
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cancelNumber = async (orderId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const url = `/api/realotp/cancel?order_id=${encodeURIComponent(orderId)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      const data: CancelNumberResponse = await response.json();
+      
+      if (data.success) {
+        setStatus('cancelled');
+        return {
+          success: true,
+          message: data.message || 'Number cancelled successfully',
+        };
+      } else {
+        const errorMessage = data.message || 'Failed to cancel number';
+        setError(errorMessage);
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error cancelling number';
       setError(errorMessage);
       return {
         success: false,
@@ -132,6 +192,7 @@ export function useRealOtpNumber() {
     setVerificationCode(null);
     setError(null);
     setStatus('idle');
+    setRetryCount(0);
   };
 
   return {
@@ -143,6 +204,9 @@ export function useRealOtpNumber() {
     status,
     requestNumber,
     checkStatus,
-    reset
+    cancelNumber,
+    reset,
+    retryCount,
+    MAX_RETRIES
   };
 } 

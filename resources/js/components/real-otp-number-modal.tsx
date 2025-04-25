@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, CheckCircle, AlertCircle, RefreshCw, Clock } from 'lucide-react';
+import { Loader2, Copy, CheckCircle, AlertCircle, RefreshCw, Clock, XCircle } from 'lucide-react';
 
 interface RealOtpNumberModalProps {
   open: boolean;
@@ -35,12 +35,16 @@ export function RealOtpNumberModal({
     status,
     requestNumber,
     checkStatus,
-    reset
+    cancelNumber,
+    reset,
+    retryCount,
+    MAX_RETRIES
   } = useRealOtpNumber();
   
   const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null);
   const [remainingTime, setRemainingTime] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState<'phone' | 'code' | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   
   // Request the number when modal opens
   useEffect(() => {
@@ -60,7 +64,10 @@ export function RealOtpNumberModal({
     if (status === 'waiting' && orderId) {
       // Start status check interval
       const interval = setInterval(() => {
-        checkStatus(orderId);
+        checkStatus(orderId).catch(() => {
+          // If there's an error during status check, we'll handle it in the hook
+          setIsRetrying(retryCount > 0 && retryCount <= MAX_RETRIES);
+        });
       }, 5000); // Check every 5 seconds
       
       setCheckInterval(interval);
@@ -129,13 +136,25 @@ export function RealOtpNumberModal({
     }
   }, [remainingTime, status]);
   
+  // Handle cancelling
+  const handleCancel = async () => {
+    if (orderId) {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        setCheckInterval(null);
+      }
+      await cancelNumber(orderId);
+    }
+  };
+  
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {status === 'completed' ? 'Verification Code Received' :
-             status === 'waiting' ? 'Waiting for SMS Code' :
+             status === 'cancelled' ? 'Number Cancelled' :
+             status === 'waiting' ? (isRetrying ? 'Reconnecting...' : 'Waiting for SMS Code') :
              status === 'failed' ? 'Request Failed' :
              'Requesting Phone Number'}
           </DialogTitle>
@@ -152,12 +171,29 @@ export function RealOtpNumberModal({
             </div>
           )}
           
+          {isRetrying && !error && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 flex items-start">
+              <RefreshCw className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0 animate-spin" />
+              <div>
+                <p className="font-medium">Reconnecting to service</p>
+                <p className="text-sm mt-1">
+                  Connection to OTP service is slow. Retrying...
+                  (Attempt {retryCount} of {MAX_RETRIES})
+                </p>
+              </div>
+            </div>
+          )}
+          
           {error && (
             <div className="bg-background border rounded-md p-4 flex items-start">
               <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-medium">Request failed</p>
-                <p className="text-sm mt-1">{error}</p>
+                <p className="text-sm mt-1">
+                  {error.includes('cURL error 28') 
+                    ? 'Connection to OTP service timed out. Please try again or try a different service.' 
+                    : error}
+                </p>
                 {status === 'waiting' && remainingTime === 0 && (
                   <p className="text-sm mt-2">
                     The SMS verification code didn't arrive within the expected time. 
@@ -177,6 +213,18 @@ export function RealOtpNumberModal({
                   The SMS verification code didn't arrive within the expected time.
                   The service might be busy or the number may no longer be active.
                   You can try requesting a new number.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {status === 'cancelled' && (
+            <div className="bg-background border rounded-md p-4 flex items-start">
+              <XCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Number Cancelled</p>
+                <p className="text-sm mt-1">
+                  You have successfully cancelled this phone number.
                 </p>
               </div>
             </div>
@@ -263,6 +311,22 @@ export function RealOtpNumberModal({
             <>
               <Button variant="secondary" onClick={handleClose}>Close</Button>
               <Button onClick={handleRetry}>Request New Number</Button>
+            </>
+          ) : status === 'cancelled' ? (
+            <>
+              <Button variant="secondary" onClick={handleClose}>Close</Button>
+              <Button onClick={handleRetry}>Request New Number</Button>
+            </>
+          ) : status === 'waiting' ? (
+            <>
+              <Button 
+                variant="destructive" 
+                onClick={handleCancel}
+                disabled={isLoading}
+              >
+                <XCircle className="h-4 w-4 mr-2" /> Cancel Number
+              </Button>
+              <Button variant="secondary" onClick={handleClose}>Close</Button>
             </>
           ) : (
             <Button variant="secondary" onClick={handleClose} className="ml-auto">Cancel</Button>

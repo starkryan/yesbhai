@@ -15,6 +15,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/realotp/services', [RealOtpController::class, 'getServices'])->name('realotp.services');
     Route::get('api/realotp/number', [RealOtpController::class, 'getNumber'])->name('realotp.number');
     Route::get('api/realotp/status', [RealOtpController::class, 'getStatus'])->name('realotp.status');
+    Route::get('api/realotp/cancel', [RealOtpController::class, 'cancelNumber'])->name('realotp.cancel');
 });
 
 require __DIR__.'/settings.php';
