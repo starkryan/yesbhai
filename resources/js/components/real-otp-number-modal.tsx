@@ -308,7 +308,7 @@ export function RealOtpNumberModal({
                     <div>
                       <p className="text-sm font-medium">Waiting for SMS</p>
                       <p className="text-sm mt-1">
-                        The system is waiting to receive the verification code
+                       waiting to receive the verification code
                       </p>
                     </div>
                     <div className="font-medium">
@@ -329,7 +329,7 @@ export function RealOtpNumberModal({
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm font-medium">Verification Code</p>
-                      <p className="text-xl font-bold mt-1">{verificationCode}</p>
+                      <p className="text-xl font-bold mt-1 text-green-500">{verificationCode}</p>
                     </div>
                     <Button 
                       variant="outline" 
