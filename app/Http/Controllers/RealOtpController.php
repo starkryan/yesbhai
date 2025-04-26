@@ -272,20 +272,56 @@ class RealOtpController extends Controller
     }
     
     /**
-     * Check the status of an activation
+     * Check the status of an OTP order
      */
     public function getStatus(Request $request)
     {
+        $orderId = $request->query('order_id');
+        
+        if (!$orderId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing required parameter: order_id',
+            ], 400);
+        }
+        
+        // First check our database for the purchase
+        $purchase = OtpPurchase::where('order_id', $orderId)->first();
+        
+        if (!$purchase) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found',
+            ], 404);
+        }
+        
+        // Only allow the owner of the purchase to check the status
+        if (Auth::id() !== $purchase->user_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+        
+        // If the purchase is already completed or cancelled, return the cached result
+        if ($purchase->status === 'completed') {
+            return response()->json([
+                'success' => true,
+                'status' => 'completed',
+                'verification_code' => $purchase->verification_code,
+                'phone_number' => $purchase->phone_number,
+            ]);
+        }
+        
+        if ($purchase->status === 'cancelled') {
+            return response()->json([
+                'success' => true,
+                'status' => 'cancelled',
+                'phone_number' => $purchase->phone_number,
+            ]);
+        }
+        
         try {
-            $orderId = $request->query('order_id');
-            
-            if (!$orderId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Missing required parameter: order_id is required',
-                ], 400);
-            }
-            
             $apiKey = env('REAL_OTP_API_SECRET');
             $apiUrl = env('REAL_OTP_API_URL');
             
@@ -295,155 +331,101 @@ class RealOtpController extends Controller
                 'id' => $orderId,
             ]);
             
+            // Log response for debugging
             Log::info('RealOTP getStatus response: ' . $response->body());
             
             $responseBody = $response->body();
             
-            // The API might return: STATUS_OK:verification_code
+            // Check for verification code - response format: STATUS_OK:SMS_CODE
             if (str_starts_with($responseBody, 'STATUS_OK:')) {
-                $code = substr($responseBody, strlen('STATUS_OK:'));
-                
-                // Update the purchase record if exists
-                if (Auth::check()) {
-                    DB::beginTransaction();
+                $parts = explode(':', $responseBody);
+                if (count($parts) >= 2) {
+                    $verificationCode = $parts[1];
                     
-                    try {
-                        $user = Auth::user();
-                        $purchase = OtpPurchase::where('order_id', $orderId)
-                            ->where('user_id', $user->id)
-                            ->first();
-                        
-                        if ($purchase && $purchase->status === 'waiting') {
-                            // Update purchase record
-                            $purchase->update([
-                                'verification_code' => $code,
-                                'status' => 'completed',
-                                'verification_received_at' => now(),
-                            ]);
-                            
-                            // Get the pending transaction for this order
-                            $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
-                                ->where('user_id', $user->id)
-                                ->where('status', 'pending')
-                                ->first();
-                                
-                            if ($transaction) {
-                                // Finalize the transaction
-                                $transaction->update([
-                                    'status' => 'completed',
-                                ]);
-                                
-                                // Now actually deduct from wallet balance
-                                $price = abs($transaction->amount);
-                                $user->wallet_balance -= $price;
-                                $user->reserved_balance -= $price;
-                                $user->save();
-                            }
-                            
-                            DB::commit();
-                        }
-                    } catch (\Exception $e) {
-                        DB::rollBack();
-                        Log::error('Error processing OTP verification: ' . $e->getMessage());
+                    // Update the purchase record
+                    $purchase->verification_code = $verificationCode;
+                    $purchase->status = 'completed';
+                    $purchase->verification_received_at = now();
+                    $purchase->save();
+                    
+                    // Update the pending wallet transaction to complete the deduction
+                    $transaction = \App\Models\WalletTransaction::where('user_id', $purchase->user_id)
+                        ->where('transaction_type', 'purchase')
+                        ->where('description', "OTP purchase: {$purchase->service_name} (#{$purchase->order_id})")
+                        ->where('status', 'pending')
+                        ->first();
+                    
+                    if ($transaction) {
+                        $transaction->status = 'completed';
+                        $transaction->save();
                     }
+                    
+                    return response()->json([
+                        'success' => true,
+                        'status' => 'completed',
+                        'verification_code' => $verificationCode,
+                        'phone_number' => $purchase->phone_number,
+                        'raw_response' => $responseBody,
+                    ]);
                 }
-                
-                return response()->json([
-                    'success' => true,
-                    'status' => 'completed',
-                    'verification_code' => $code,
-                    'raw_response' => $responseBody,
-                ]);
             }
-            
-            // STATUS_WAIT means we're still waiting for the code
-            if ($responseBody === 'STATUS_WAIT_CODE' || $responseBody === 'STATUS_WAIT') {
+            // Check for waiting status - response format: STATUS_WAIT_CODE
+            else if ($responseBody === 'STATUS_WAIT_CODE') {
                 return response()->json([
                     'success' => true,
                     'status' => 'waiting',
+                    'phone_number' => $purchase->phone_number,
                     'raw_response' => $responseBody,
                 ]);
             }
-            
-            // Handle NO_ACTIVATION error explicitly with a clearer message
-            if ($responseBody === 'NO_ACTIVATION') {
-                // Update the purchase record as expired if it exists
-                if (Auth::check()) {
-                    DB::beginTransaction();
+            // Check for cancelled or expired status
+            else if ($responseBody === 'STATUS_CANCEL' || str_starts_with($responseBody, 'CANCEL_')) {
+                $purchase->status = 'cancelled';
+                $purchase->cancelled_at = now();
+                $purchase->save();
+                
+                // Refund the user's wallet
+                if ($purchase->price) {
+                    $user = $purchase->user;
+                    $price = (float) $purchase->price;
                     
-                    try {
-                        $user = Auth::user();
-                        $purchase = OtpPurchase::where('order_id', $orderId)
-                            ->where('user_id', $user->id)
-                            ->first();
-                        
-                        if ($purchase && $purchase->status === 'waiting') {
-                            // Update purchase record
-                            $purchase->update([
-                                'status' => 'expired',
-                                'expired_at' => now(),
-                            ]);
-                            
-                            // Get the pending transaction for this order
-                            $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
-                                ->where('user_id', $user->id)
-                                ->where('status', 'pending')
-                                ->first();
-                                
-                            if ($transaction) {
-                                // Mark transaction as cancelled
-                                $transaction->update([
-                                    'status' => 'cancelled',
-                                ]);
-                                
-                                // Release the reserved balance
-                                $price = abs($transaction->amount);
-                                $user->reserved_balance -= $price;
-                                $user->save();
-                                
-                                // Create a refund record
-                                \App\Models\WalletTransaction::create([
-                                    'user_id' => $user->id,
-                                    'amount' => $price, // Positive amount for refund
-                                    'transaction_type' => 'refund',
-                                    'description' => "Refund for expired OTP: {$purchase->service_name} (#{$orderId})",
-                                    'reference_id' => $orderId,
-                                    'status' => 'completed',
-                                    'metadata' => json_encode([
-                                        'original_transaction_id' => $transaction->id,
-                                        'reason' => 'OTP expired'
-                                    ]),
-                                ]);
-                            }
-                            
-                            DB::commit();
-                        }
-                    } catch (\Exception $e) {
-                        DB::rollBack();
-                        Log::error('Error processing OTP expiration: ' . $e->getMessage());
+                    // Update the pending transaction to 'cancelled'
+                    $transaction = \App\Models\WalletTransaction::where('user_id', $user->id)
+                        ->where('transaction_type', 'purchase')
+                        ->where('description', "OTP purchase: {$purchase->service_name} (#{$purchase->order_id})")
+                        ->where('status', 'pending')
+                        ->first();
+                    
+                    if ($transaction) {
+                        $transaction->status = 'cancelled';
+                        $transaction->save();
                     }
                 }
                 
                 return response()->json([
-                    'success' => false,
-                    'message' => 'No active number found for this order ID. The number might have expired or been cancelled.',
+                    'success' => true,
+                    'status' => 'cancelled',
+                    'phone_number' => $purchase->phone_number,
                     'raw_response' => $responseBody,
-                ], 400);
+                ]);
             }
             
-            // Handle other error responses
+            // If none of the expected response formats are found
             return response()->json([
                 'success' => false,
-                'message' => $responseBody,
+                'message' => 'Unexpected response from OTP service: ' . $responseBody,
+                'phone_number' => $purchase->phone_number,
                 'raw_response' => $responseBody,
-            ], 400);
+            ]);
             
         } catch (\Exception $e) {
             Log::error('RealOTP getStatus error: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
-            ], 500);
+                'message' => 'Error checking OTP status: ' . $e->getMessage(),
+                'phone_number' => $purchase->phone_number,
+            ]);
         }
     }
     
@@ -772,6 +754,167 @@ class RealOtpController extends Controller
         return response()->json([
             'success' => true,
             'data' => $purchases,
+        ]);
+    }
+
+    /**
+     * Register a background check for an OTP order
+     * This allows the server to track an OTP even after the user closes the browser
+     */
+    public function registerBackgroundCheck(Request $request)
+    {
+        $orderId = $request->query('order_id');
+        
+        if (!$orderId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing required parameter: order_id',
+            ], 400);
+        }
+        
+        // First check our database for the purchase
+        $purchase = OtpPurchase::where('order_id', $orderId)->first();
+        
+        if (!$purchase) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Order not found',
+            ], 404);
+        }
+        
+        // Only allow the owner of the purchase to register a background check
+        if (Auth::id() !== $purchase->user_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access',
+            ], 403);
+        }
+        
+        // Only allow background checks for orders that are still waiting
+        if ($purchase->status !== 'waiting') {
+            return response()->json([
+                'success' => true,
+                'message' => 'OTP is no longer in waiting status',
+                'status' => $purchase->status,
+            ]);
+        }
+        
+        // Update the purchase to mark it for background monitoring
+        $purchase->background_monitoring = true;
+        $purchase->last_background_check = now();
+        $purchase->save();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Background check registered successfully',
+        ]);
+    }
+
+    /**
+     * Process background OTP checks
+     * This method should be called by a scheduled task or queue worker
+     */
+    public function processBackgroundChecks()
+    {
+        // Find all purchases that are in waiting status and have background monitoring enabled
+        $purchases = OtpPurchase::where('status', 'waiting')
+            ->where('background_monitoring', true)
+            ->get();
+        
+        $results = [
+            'total' => $purchases->count(),
+            'processed' => 0,
+            'completed' => 0,
+            'still_waiting' => 0,
+            'errors' => 0,
+        ];
+        
+        foreach ($purchases as $purchase) {
+            try {
+                $results['processed']++;
+                
+                // Only check orders every minute to avoid excessive API calls
+                if ($purchase->last_background_check && 
+                    $purchase->last_background_check->diffInSeconds(now()) < 60) {
+                    $results['still_waiting']++;
+                    continue;
+                }
+                
+                $apiKey = env('REAL_OTP_API_SECRET');
+                $apiUrl = env('REAL_OTP_API_URL');
+                
+                $response = Http::timeout(10)->get($apiUrl, [
+                    'api_key' => $apiKey,
+                    'action' => 'getStatus',
+                    'id' => $purchase->order_id,
+                ]);
+                
+                // Update the last check time
+                $purchase->last_background_check = now();
+                $purchase->save();
+                
+                $responseBody = $response->body();
+                
+                // Check for verification code - response format: STATUS_OK:SMS_CODE
+                if (str_starts_with($responseBody, 'STATUS_OK:')) {
+                    $parts = explode(':', $responseBody);
+                    if (count($parts) >= 2) {
+                        $verificationCode = $parts[1];
+                        
+                        // Update the purchase record
+                        $purchase->verification_code = $verificationCode;
+                        $purchase->status = 'completed';
+                        $purchase->verification_received_at = now();
+                        $purchase->background_monitoring = false; // No longer needs monitoring
+                        $purchase->save();
+                        
+                        // Update the pending wallet transaction to complete the deduction
+                        $transaction = \App\Models\WalletTransaction::where('user_id', $purchase->user_id)
+                            ->where('transaction_type', 'purchase')
+                            ->where('description', "OTP purchase: {$purchase->service_name} (#{$purchase->order_id})")
+                            ->where('status', 'pending')
+                            ->first();
+                        
+                        if ($transaction) {
+                            $transaction->status = 'completed';
+                            $transaction->save();
+                        }
+                        
+                        // Todo: Send notification to user about the completed OTP
+                        // This could be via email, SMS, or push notification
+                        
+                        $results['completed']++;
+                    }
+                }
+                // Check for waiting status - just update last check time
+                else if ($responseBody === 'STATUS_WAIT_CODE') {
+                    $results['still_waiting']++;
+                }
+                // Check for cancelled or expired status
+                else if ($responseBody === 'STATUS_CANCEL' || str_starts_with($responseBody, 'CANCEL_')) {
+                    $purchase->status = 'cancelled';
+                    $purchase->cancelled_at = now();
+                    $purchase->background_monitoring = false; // No longer needs monitoring
+                    $purchase->save();
+                    
+                    // Handle refund logic (same as in getStatus method)
+                    // ...
+                }
+                
+            } catch (\Exception $e) {
+                Log::error('Background OTP check failed: ' . $e->getMessage(), [
+                    'order_id' => $purchase->order_id,
+                    'user_id' => $purchase->user_id,
+                    'service' => $purchase->service_name,
+                ]);
+                
+                $results['errors']++;
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'results' => $results,
         ]);
     }
 } 

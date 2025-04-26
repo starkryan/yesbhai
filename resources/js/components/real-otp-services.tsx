@@ -5,9 +5,7 @@ import {
   CardContent, 
   CardHeader, 
   CardTitle,
-  CardDescription,
-  CardFooter
-} from '@/components/ui/card';
+  CardDescription} from '@/components/ui/card';
 import { 
   Pagination, 
   PaginationContent, 
@@ -19,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ChevronDown, ChevronUp, Database, RefreshCw, ShoppingCart, Phone } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, RefreshCw, Phone } from 'lucide-react';
 import { RealOtpNumberModal } from './real-otp-number-modal';
 
 export function RealOtpServices() {
@@ -127,18 +125,7 @@ export function RealOtpServices() {
     <>
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>OTP Services</span>
-            {dataSource && dataSource !== 'api' && (
-              <span className="text-xs px-2 py-1 rounded-full">
-                {dataSource === 'cache' ? 'Cached Data' : 
-                dataSource === 'fallback' ? 'Fallback Data' : 
-                dataSource === 'sample' ? 'Sample Data' : 
-                dataSource === 'emergency_cache' ? 'Emergency Cache' : 
-                dataSource}
-              </span>
-            )}
-          </CardTitle>
+         
           <CardDescription>
             Browse and select OTP services
             {error && (
@@ -276,17 +263,7 @@ export function RealOtpServices() {
             </Pagination>
           )}
         </CardContent>
-        <CardFooter className="text-xs text-gray-500 border-t pt-4">
-          <div className="flex items-center gap-1">
-            <Database className="h-3 w-3" />
-            {dataSource === 'api' ? 'Live data from RealOTP API' : 
-            dataSource === 'cache' ? 'Cached data (refreshed within 30 min)' : 
-            dataSource === 'fallback' ? 'Fallback data (API unavailable)' : 
-            dataSource === 'sample' ? 'Sample data (API unavailable)' : 
-            dataSource === 'emergency_cache' ? 'Emergency cached data (API unavailable)' : 
-            'Data source unknown'}
-          </div>
-        </CardFooter>
+       
       </Card>
       
       {selectedService && (

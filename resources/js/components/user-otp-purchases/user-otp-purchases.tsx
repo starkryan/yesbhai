@@ -27,7 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, AlertCircle, Clock, CheckCircle, XCircle, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { Search, AlertCircle, Clock, CheckCircle, XCircle, Copy, ExternalLink, Loader2, Eye } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/dialog';
 // import { useToast } from '@/hooks/use-toast';
 import { toast } from 'sonner'; 
+import { RealOtpNumberModal } from '../real-otp-number-modal';
 
 interface OtpPurchase {
   id: number;
@@ -89,7 +90,15 @@ export function UserOtpPurchases() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<OtpPurchase | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
- 
+  
+  // New state for viewing OTP details modal
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedOtpForView, setSelectedOtpForView] = useState<{
+    serviceCode: string;
+    serverCode: string;
+    serviceName: string;
+    orderId: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchPurchases(currentPage);
@@ -155,6 +164,17 @@ export function UserOtpPurchases() {
   const handleCancelClick = (purchase: OtpPurchase) => {
     setSelectedPurchase(purchase);
     setCancelModalOpen(true);
+  };
+  
+  // New function to handle viewing OTP details
+  const handleViewDetails = (purchase: OtpPurchase) => {
+    setSelectedOtpForView({
+      serviceCode: purchase.service_code,
+      serverCode: purchase.server_code,
+      serviceName: purchase.service_name,
+      orderId: purchase.order_id
+    });
+    setDetailsModalOpen(true);
   };
 
   const cancelOtp = async () => {
@@ -333,15 +353,26 @@ export function UserOtpPurchases() {
                     </TableCell>
                     <TableCell>
                       {purchase.status === 'waiting' && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => handleCancelClick(purchase)}
-                        >
-                          <XCircle className="h-3.5 w-3.5 mr-1" />
-                          Cancel
-                        </Button>
+                        <div className="flex flex-col space-y-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleViewDetails(purchase)}
+                            className="border-blue-200 hover:bg-blue-50 w-full justify-start"
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            View Details
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-red-600 border-red-200 hover:bg-red-50 w-full justify-start"
+                            onClick={() => handleCancelClick(purchase)}
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />
+                            Cancel
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -470,6 +501,18 @@ export function UserOtpPurchases() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add OTP Details Modal */}
+      {selectedOtpForView && (
+        <RealOtpNumberModal
+          open={detailsModalOpen}
+          onClose={() => setDetailsModalOpen(false)}
+          serviceCode={selectedOtpForView.serviceCode}
+          serverCode={selectedOtpForView.serverCode}
+          serviceName={selectedOtpForView.serviceName}
+          existingOrderId={selectedOtpForView.orderId}
+        />
+      )}
     </>
   );
 } 

@@ -27,6 +27,8 @@ class OtpPurchase extends Model
         'verification_received_at',
         'cancelled_at',
         'expired_at',
+        'background_monitoring',
+        'last_background_check',
     ];
 
     /**
@@ -38,7 +40,9 @@ class OtpPurchase extends Model
         'verification_received_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'expired_at' => 'datetime',
+        'last_background_check' => 'datetime',
         'price' => 'decimal:2',
+        'background_monitoring' => 'boolean',
     ];
 
     /**

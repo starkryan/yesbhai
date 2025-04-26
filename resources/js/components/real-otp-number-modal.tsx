@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, Copy, CheckCircle, AlertCircle, RefreshCw, Clock, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface RealOtpNumberModalProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface RealOtpNumberModalProps {
   serviceCode: string;
   serverCode: string;
   serviceName: string;
+  existingOrderId?: string;
 }
 
 export function RealOtpNumberModal({
@@ -25,6 +27,7 @@ export function RealOtpNumberModal({
   serviceCode,
   serverCode,
   serviceName,
+  existingOrderId,
 }: RealOtpNumberModalProps) {
   const {
     isLoading,
@@ -38,7 +41,9 @@ export function RealOtpNumberModal({
     cancelNumber,
     reset,
     retryCount,
-    MAX_RETRIES
+    MAX_RETRIES,
+    persistState,
+    loadPersistedState
   } = useRealOtpNumber();
   
   const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null);
@@ -47,30 +52,46 @@ export function RealOtpNumberModal({
   const [isRetrying, setIsRetrying] = useState(false);
   const [insufficientBalance, setInsufficientBalance] = useState<{current: string, required: string} | null>(null);
   
+  // Try to load existing persisted state for this service
+  useEffect(() => {
+    if (open && existingOrderId) {
+      // First try to load any persisted state for this order
+      loadPersistedState(existingOrderId);
+      // Then check for status update from the server
+      checkStatus(existingOrderId);
+    }
+  }, [open, existingOrderId]);
+  
   // Request the number when modal opens
   useEffect(() => {
-    if (open && status === 'idle') {
-      requestNumber({ 
-        service_code: serviceCode, 
-        server_code: serverCode,
-        service_name: serviceName
-      }).then(result => {
-        if (!result.success && result.error?.includes('Insufficient wallet balance')) {
-          try {
-            // Try to extract the balance details from error message
-            const errorData = JSON.parse(result.error);
-            if (errorData.current_balance !== undefined && errorData.required_price !== undefined) {
-              setInsufficientBalance({
-                current: errorData.current_balance,
-                required: errorData.required_price
-              });
+    if (open) {
+      if (existingOrderId) {
+        // If an existing order ID is provided, just check its status instead of requesting a new number
+        checkStatus(existingOrderId);
+      } else if (status === 'idle') {
+        // Otherwise request a new number
+        requestNumber({ 
+          service_code: serviceCode, 
+          server_code: serverCode,
+          service_name: serviceName
+        }).then(result => {
+          if (!result.success && result.error?.includes('Insufficient wallet balance')) {
+            try {
+              // Try to extract the balance details from error message
+              const errorData = JSON.parse(result.error);
+              if (errorData.current_balance !== undefined && errorData.required_price !== undefined) {
+                setInsufficientBalance({
+                  current: errorData.current_balance,
+                  required: errorData.required_price
+                });
+              }
+            } catch (e) {
+              // If we can't parse the error, just set the standard error message
+              // It will be handled by the error state in the hook
             }
-          } catch (e) {
-            // If we can't parse the error, just set the standard error message
-            // It will be handled by the error state in the hook
           }
-        }
-      });
+        });
+      }
     }
     
     return () => {
@@ -78,17 +99,20 @@ export function RealOtpNumberModal({
         clearInterval(checkInterval);
       }
     };
-  }, [open, serviceCode, serverCode, serviceName]);
+  }, [open, serviceCode, serverCode, serviceName, existingOrderId]);
   
   // Set up timer for checking status and countdown
   useEffect(() => {
-    if (status === 'waiting' && orderId) {
+    if (status === 'waiting' && (orderId || existingOrderId)) {
       // Start status check interval
       const interval = setInterval(() => {
-        checkStatus(orderId).catch(() => {
-          // If there's an error during status check, we'll handle it in the hook
-          setIsRetrying(retryCount > 0 && retryCount <= MAX_RETRIES);
-        });
+        const orderToCheck = orderId || existingOrderId;
+        if (orderToCheck) {
+          checkStatus(orderToCheck).catch(() => {
+            // If there's an error during status check, we'll handle it in the hook
+            setIsRetrying(retryCount > 0 && retryCount <= MAX_RETRIES);
+          });
+        }
       }, 5000); // Check every 5 seconds
       
       setCheckInterval(interval);
@@ -113,8 +137,20 @@ export function RealOtpNumberModal({
     // If we get a verification code, stop checking
     if (status === 'completed' && checkInterval) {
       clearInterval(checkInterval);
+      
+      // Show notification when verification code is received
+      if (verificationCode && !open) {
+        toast.success(`OTP Code Received: ${verificationCode}`, {
+          description: `For service: ${serviceName}`,
+          duration: 10000,
+          action: {
+            label: "Copy",
+            onClick: () => navigator.clipboard.writeText(verificationCode)
+          }
+        });
+      }
     }
-  }, [status, orderId]);
+  }, [status, orderId, existingOrderId, verificationCode, open, serviceName]);
   
   // Format time as minutes:seconds
   const formatTime = (seconds: number) => {
@@ -130,12 +166,46 @@ export function RealOtpNumberModal({
     setTimeout(() => setCopied(null), 2000);
   };
   
-  // Handle closing
+  // Handle closing - now with option to keep monitoring in background
   const handleClose = () => {
+    // Stop UI update intervals but don't reset state
     if (checkInterval) {
       clearInterval(checkInterval);
+      setCheckInterval(null);
     }
-    reset();
+    
+    // Persist current state so it can be resumed
+    if (orderId && status === 'waiting') {
+      persistState(orderId, {
+        phoneNumber,
+        serviceCode,
+        serverCode,
+        serviceName
+      });
+      
+      toast.info("OTP Request Active", {
+        description: "We'll continue monitoring your OTP in the background.",
+        duration: 5000,
+      });
+      
+      // Set up background monitoring through server-side checking
+      const orderToCheck = orderId || existingOrderId;
+      if (orderToCheck) {
+        // Register background check with the server
+        fetch(`/api/realotp/register-background-check?order_id=${orderToCheck}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        }).catch(() => {
+          // Ignore errors in background registration
+        });
+      }
+    } else {
+      // Reset state if not actively waiting
+      reset();
+    }
+    
     onClose();
   };
   
@@ -163,12 +233,13 @@ export function RealOtpNumberModal({
   
   // Handle cancelling
   const handleCancel = async () => {
-    if (orderId) {
+    const orderToCancel = orderId || existingOrderId;
+    if (orderToCancel) {
       if (checkInterval) {
         clearInterval(checkInterval);
         setCheckInterval(null);
       }
-      await cancelNumber(orderId);
+      await cancelNumber(orderToCancel);
     }
   };
   
@@ -321,6 +392,9 @@ export function RealOtpNumberModal({
                       style={{ width: `${(remainingTime / 300) * 100}%` }}
                     ></div>
                   </div>
+                  <div className="mt-3 text-xs text-gray-500">
+                    You can close this modal and we'll continue checking for your code in the background.
+                  </div>
                 </div>
               )}
               
@@ -343,9 +417,9 @@ export function RealOtpNumberModal({
                 </div>
               )}
               
-              {orderId && (
+              {(orderId || existingOrderId) && (
                 <div className="text-xs text-gray-500">
-                  Order ID: {orderId}
+                  Order ID: {orderId || existingOrderId}
                 </div>
               )}
             </div>
@@ -379,7 +453,9 @@ export function RealOtpNumberModal({
               >
                 <XCircle className="h-4 w-4 mr-2" /> Cancel Number
               </Button>
-              <Button variant="secondary" onClick={handleClose}>Close</Button>
+              <Button variant="secondary" onClick={handleClose}>
+                Continue in Background
+              </Button>
             </>
           ) : (
             <Button variant="secondary" onClick={handleClose} className="ml-auto">Cancel</Button>

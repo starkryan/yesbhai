@@ -13,11 +13,31 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { Wallet } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: BreadcrumbItem[] }) {
   const { auth } = usePage<SharedData>().props;
   const getInitials = useInitials();
+  const [availableBalance, setAvailableBalance] = useState<string>('0.00');
+  
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
+      try {
+        const response = await axios.get('/api/wallet/transactions');
+        setAvailableBalance(
+          (response.data.available_balance || response.data.wallet_balance || '0.00').toFixed(2)
+        );
+      } catch (err) {
+        console.error('Error fetching wallet balance:', err);
+      }
+    };
 
+    if (auth.user) {
+      fetchWalletBalance();
+    }
+  }, [auth.user]);
+  
   return (
     <header className="border-sidebar-border/50 flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-6">
       {/* Left side: Breadcrumbs */}
@@ -32,7 +52,7 @@ export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrumb
         {auth.user && (
           <div className="flex items-center gap-1 rounded-lg border bg-accent px-2 py-1.5 md:px-3">
             <Wallet className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium md:text-sm">₹{auth.user.wallet_balance || '0.00'}</span>
+            <span className="text-xs font-medium md:text-sm">₹{availableBalance}</span>
           </div>
         )}
         

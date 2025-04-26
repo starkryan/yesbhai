@@ -37,6 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('api/realotp/status', [RealOtpController::class, 'getStatus'])->name('realotp.status');
     Route::get('api/realotp/cancel', [RealOtpController::class, 'cancelNumber'])->name('realotp.cancel');
     Route::get('api/realotp/purchases', [RealOtpController::class, 'getUserPurchases'])->name('realotp.purchases');
+    Route::get('api/realotp/register-background-check', [RealOtpController::class, 'registerBackgroundCheck'])->name('realotp.register-background-check');
 
     // Wallet Recharge Routes
     Route::get('/recharge', [RechargeController::class, 'index'])->name('recharge');
