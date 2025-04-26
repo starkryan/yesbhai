@@ -23,7 +23,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     href: '/dashboard',
   },
   {
-    title: 'Recharge Wallet',
+    title: 'Recharge',
     href: '/recharge',
   },
 ];
@@ -95,7 +95,7 @@ export default function Recharge() {
       <Head title="Recharge Wallet" />
       <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Recharge Wallet</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Recharge</h1>
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-500">
               Add funds to your wallet to use for OTP services
@@ -106,9 +106,9 @@ export default function Recharge() {
                 <span className="text-sm text-gray-500">Loading balance...</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Wallet className="h-4 w-4 text-primary" />
-                <span className="font-medium">Balance: ₹{walletBalance || '0.00'}</span>
+                <span className="font-medium">₹{walletBalance || '0.00'}</span>
               </div>
             )}
           </div>
@@ -116,6 +116,7 @@ export default function Recharge() {
         
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
+            
             <CardHeader>
               <CardTitle>Add Funds</CardTitle>
               <CardDescription>
