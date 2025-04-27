@@ -26,7 +26,7 @@ class RechargeController extends Controller
     public function initiateRecharge(Request $request)
     {
         $request->validate([
-            'amount' => 'required|numeric|min:1|max:10000',
+            'amount' => 'required|numeric|min:20|max:10000',
         ]);
 
         $user = Auth::user();
