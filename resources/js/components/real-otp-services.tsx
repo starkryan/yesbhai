@@ -143,20 +143,20 @@ export function RealOtpServices() {
             />
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
+        <CardContent className="w-full">
+          <div className="rounded-md border max-w-none w-full">
             {paginatedServices.length > 0 ? (
               paginatedServices.map((serviceName) => {
                 const originalKey = getOriginalKey(serviceName);
                 const serviceItems = services[originalKey] || [];
                 
                 return (
-                  <div key={serviceName} className="border-b last:border-b-0">
+                  <div key={serviceName} className="border-b last:border-b-0 w-full">
                     <div 
-                      className="flex items-center justify-between gap-2 p-4 cursor-pointer"
+                      className="flex items-center justify-between gap-2 p-4 cursor-pointer w-full"
                       onClick={() => toggleService(serviceName)}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-1">
                         <span className="font-medium">{serviceName}</span>
                         <span className="text-xs text-gray-500">({serviceItems.length} Servers)</span>
                       </div>
@@ -169,8 +169,8 @@ export function RealOtpServices() {
                     </div>
                     
                     {expandedService === serviceName && (
-                      <div className="p-4">
-                        <div className="mb-2 grid grid-cols-3 gap-2 text-sm font-medium">
+                      <div className="p-4 w-full">
+                        <div className="mb-2 grid grid-cols-3 gap-2 text-sm font-medium w-full">
                           <div>Server</div>
                           <div>Country</div>
                           <div className="text-right">Price</div>
@@ -179,14 +179,17 @@ export function RealOtpServices() {
                           serviceItems.map((item, index) => (
                             <div 
                               key={`${item.service_code}-${item.server_code}-${index}`}
-                              className="grid grid-cols-3 gap-2 py-2 border-t first:border-t-0 items-center"
+                              className="grid grid-cols-3 gap-2 py-2 border-t first:border-t-0 items-center w-full"
                             >
                               <div className="text-sm font-medium">Server {item.server_code}</div>
                               <div className="flex items-center gap-1 text-sm">
                                 <span className="inline-block">🇮🇳</span>India
                               </div>
                               <div className="flex items-center justify-end gap-3">
-                                <span className="font-medium">₹{item.price}</span>
+                                <div className="flex flex-col items-end">
+                                  <span className="font-medium">₹{item.price}</span>
+                                  
+                                </div>
                                 <Button 
                                   size="sm" 
                                   variant="outline" 

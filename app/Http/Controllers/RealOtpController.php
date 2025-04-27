@@ -17,6 +17,15 @@ use Illuminate\Database\Schema\Blueprint;
 class RealOtpController extends Controller
 {
     /**
+     * Constructor - allows cache clearing if needed
+     */
+    public function __construct()
+    {
+        // Uncomment this line to clear the services cache if needed during development
+        Cache::forget('realotp_services');
+    }
+    
+    /**
      * Get services data from RealOTP API
      */
     public function getServices()
@@ -24,9 +33,13 @@ class RealOtpController extends Controller
         try {
             // Check if we have cached data first
             if (Cache::has('realotp_services')) {
+                $services = Cache::get('realotp_services');
+                // Apply 10% commission to cached prices
+                $services = $this->applyCommission($services);
+                
                 return response()->json([
                     'success' => true,
-                    'data' => Cache::get('realotp_services'),
+                    'data' => $services,
                     'source' => 'cache'
                 ]);
             }
@@ -43,6 +56,9 @@ class RealOtpController extends Controller
             if ($response->successful()) {
                 $data = $response->json();
                 
+                // Apply 10% commission to all prices before caching
+                $data = $this->applyCommission($data);
+                
                 // Cache the successful response for 30 minutes
                 Cache::put('realotp_services', $data, now()->addMinutes(30));
                 
@@ -56,6 +72,9 @@ class RealOtpController extends Controller
             // If API fails but we have a fallback JSON, use that
             if (file_exists(storage_path('app/realotp_fallback.json'))) {
                 $fallbackData = json_decode(file_get_contents(storage_path('app/realotp_fallback.json')), true);
+                // Apply 10% commission to fallback data prices
+                $fallbackData = $this->applyCommission($fallbackData);
+                
                 return response()->json([
                     'success' => true,
                     'data' => $fallbackData,
@@ -77,15 +96,21 @@ class RealOtpController extends Controller
             
             // Try to load from cache even if it's expired as a fallback
             if (Cache::has('realotp_services')) {
+                $services = Cache::get('realotp_services');
+                // Apply 10% commission to emergency cache prices
+                $services = $this->applyCommission($services);
+                
                 return response()->json([
                     'success' => true,
-                    'data' => Cache::get('realotp_services'),
+                    'data' => $services,
                     'source' => 'emergency_cache'
                 ]);
             }
             
             // Last resort - use the sample data we received in the query
             $sampleData = $this->getSampleData();
+            // Apply 10% commission to sample data prices
+            $sampleData = $this->applyCommission($sampleData);
             
             // Store this sample data as our fallback file
             if (!file_exists(storage_path('app/realotp_fallback.json'))) {
@@ -99,6 +124,22 @@ class RealOtpController extends Controller
                 'original_error' => $e->getMessage()
             ]);
         }
+    }
+    
+    /**
+     * Apply 10% commission to service prices
+     */
+    private function applyCommission($services)
+    {
+        foreach ($services as $serviceName => $serviceItems) {
+            foreach ($serviceItems as $index => $item) {
+                // Calculate 10% commission on the price
+                $originalPrice = (float) $item['price'];
+                $priceWithCommission = round($originalPrice * 1.1, 2);
+                $services[$serviceName][$index]['price'] = (string) $priceWithCommission;
+            }
+        }
+        return $services;
     }
     
     /**
@@ -118,7 +159,7 @@ class RealOtpController extends Controller
                 ], 400);
             }
             
-            // Get the price for this service
+            // Get the price for this service - this already includes 10% commission
             $price = $this->getServicePrice($serviceCode, $serverCode);
             
             // Verify user authentication
@@ -180,7 +221,7 @@ class RealOtpController extends Controller
                         // Place a hold on the user's wallet instead of immediately deducting
                         // We'll only finalize the transaction when the OTP is received
                         
-                        // Save the purchase in database
+                        // Save the purchase in database - store the price with commission
                         $otpPurchase = OtpPurchase::create([
                             'user_id' => $user->id,
                             'order_id' => $orderId,
@@ -188,14 +229,14 @@ class RealOtpController extends Controller
                             'service_name' => $serviceName,
                             'service_code' => $serviceCode,
                             'server_code' => $serverCode,
-                            'price' => $price,
+                            'price' => $price, // This is the price with 10% commission
                             'status' => 'waiting',
                         ]);
                         
                         // Create a wallet transaction record with 'pending' status
                         \App\Models\WalletTransaction::create([
                             'user_id' => $user->id,
-                            'amount' => -1 * (float)$price,
+                            'amount' => -1 * (float)$price, // This amount must match the price with commission
                             'transaction_type' => 'purchase',
                             'description' => "OTP purchase: {$serviceName} (#{$orderId})",
                             'reference_id' => $orderId,
@@ -216,7 +257,7 @@ class RealOtpController extends Controller
                             });
                         }
                         
-                        // Reserve the amount from user's balance
+                        // Reserve the amount from user's balance (must use the exact same price as in transaction)
                         $user->reserved_balance = $user->reserved_balance + (float)$price;
                         $user->save();
                         
@@ -561,6 +602,7 @@ class RealOtpController extends Controller
      */
     private function getSampleData()
     {
+        // Note: These are base prices WITHOUT commission - commission will be added by applyCommission method
         return [
             "168" => [
                 [
@@ -721,13 +763,15 @@ class RealOtpController extends Controller
         // If still nothing, use sample data
         if (!$services) {
             $services = $this->getSampleData();
+            // Apply commission to sample data if not already applied
+            $services = $this->applyCommission($services);
         }
         
         // Search for the price
         foreach ($services as $serviceName => $serviceItems) {
             foreach ($serviceItems as $item) {
                 if ($item['service_code'] === $serviceCode && $item['server_code'] === $serverCode) {
-                    return $item['price'];
+                    return $item['price']; // This price already includes 10% commission
                 }
             }
         }
