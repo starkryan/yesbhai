@@ -23,9 +23,9 @@ export default function Dashboard() {
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
                 <Comp303 />
                 <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-bold tracking-tight">OTP Services Dashboard</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">OTPMaya</h1>
                     <p className="text-sm text-gray-500">
-                        Browse and manage OTP services from RealOTP
+                        Browse and manage OTP services
                     </p>
                 </div>
                 

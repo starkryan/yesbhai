@@ -15,12 +15,12 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-
+import { Link } from '@inertiajs/react';
 export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: BreadcrumbItem[] }) {
   const { auth } = usePage<SharedData>().props;
   const getInitials = useInitials();
   const [availableBalance, setAvailableBalance] = useState<string>('0.00');
-  
+
   useEffect(() => {
     const fetchWalletBalance = async () => {
       try {
@@ -37,7 +37,7 @@ export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrumb
       fetchWalletBalance();
     }
   }, [auth.user]);
-  
+
   return (
     <header className="border-sidebar-border/50 flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-6">
       {/* Left side: Breadcrumbs */}
@@ -45,17 +45,20 @@ export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrumb
         <SidebarTrigger className="-ml-1" />
         <Breadcrumbs breadcrumbs={breadcrumbs} />
       </div>
-      
+
       {/* Right side: Wallet balance and profile */}
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Wallet balance */}
         {auth.user && (
-          <div className="flex items-center gap-1 rounded-lg border bg-accent px-2 py-1.5 md:px-3">
+          <div className="flex items-center gap-2 rounded-lg border bg-accent px-2 py-1.5 md:px-3">
             <Wallet className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium md:text-sm">₹{availableBalance}</span>
+            <Link href="/recharge" className="text-[10px] font-semibold md:text-xs hover:underline text-red-400">
+              Recharge
+            </Link>
           </div>
         )}
-        
+
+
         {/* User profile */}
         {auth.user && (
           <DropdownMenu>

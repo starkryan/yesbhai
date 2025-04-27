@@ -194,9 +194,15 @@ class RechargeController extends Controller
                         $user->wallet_balance = $user->wallet_balance + $recharge->amount;
                         $user->save();
                         
-                        // Add this line to log the user back in
+                        // Log the user back in FIRST
                         Auth::login($user); 
                         
+                        DB::commit();
+
+                        // THEN Refresh the authenticated user instance used by the framework
+                        // to ensure subsequent calls to Auth::user() or $request->user() get the updated balance
+                        Auth::setUser($user->fresh());
+
                         Log::info('Wallet recharged successfully', [
                             'user_id' => $user->id,
                             'amount' => $recharge->amount,
@@ -207,7 +213,6 @@ class RechargeController extends Controller
                         throw new \Exception('User not found for recharge: ' . $recharge->user_id);
                     }
                     
-                    DB::commit();
                 } catch (\Exception $e) {
                     DB::rollBack();
                     Log::error('Transaction failed during payment processing', [
