@@ -51,7 +51,7 @@ php artisan view:clear
 echo "🔄 Restarting Nginx..."
 sudo systemctl restart nginx
 echo "🔄 Restarting PHP-FPM..."
-sudo systemctl restart php8.2-fpm  # Change version if needed
+sudo systemctl restart php8.3-fpm  # Change version if needed
 
 # Optionally clear OPcache
 echo "🧹 Clearing OPcache..."

@@ -37,7 +37,7 @@ function Support() {
                             Our support team is available to assist you through the following channels:
                         </p>
                         <ul className="list-disc pl-5 mt-2 space-y-1 ">
-                            <li>Email: <a href="mailto:support@realotp.com" className="text-blue-600 hover:underline">support@realotp.com</a></li>
+                            <li>Email: <a href="mailto:support@otpmaya.fun" className="text-blue-600 hover:underline">support@otpmaya.fun</a></li>
                             <li>Live Chat: Available on dashboard during business hours</li>
                             <li>Telegram: Join our <a href="/telegram" className="text-blue-600 hover:underline">Telegram channel</a> for quick responses</li>
                         </ul>
