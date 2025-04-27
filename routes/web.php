@@ -25,10 +25,6 @@ Route::get('/recharge/public-result', [RechargeController::class, 'showPublicRes
     ->name('recharge.public.result');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::any('/recharge/callback', [RechargeController::class, 'handleCallback'])
-        ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class])
-        ->name('recharge.callback');
-
     Route::get('dashboard', [RealOtpController::class, 'dashboard'])->name('dashboard');
     
     // RealOTP API Routes

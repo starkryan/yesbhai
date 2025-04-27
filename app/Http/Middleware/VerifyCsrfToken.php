@@ -12,7 +12,7 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        'recharge/callback', // ApnaBestUPI callback URL
-        'api/payment/webhook', // Alternative webhook URL if needed
+        '/recharge/callback',   // ApnaBestUPI callback URL
+        '/api/payment/webhook', // Alternative webhook URL if needed
     ];
-} 
+}
