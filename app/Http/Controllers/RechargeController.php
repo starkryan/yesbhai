@@ -26,7 +26,7 @@ class RechargeController extends Controller
     public function initiateRecharge(Request $request)
     {
         $request->validate([
-            'amount' => 'required|numeric|min:20|max:10000',
+            'amount' => 'required|numeric|min:1|max:10000',
         ]);
 
         $user = Auth::user();
@@ -193,6 +193,9 @@ class RechargeController extends Controller
                     if ($user) {
                         $user->wallet_balance = $user->wallet_balance + $recharge->amount;
                         $user->save();
+                        
+                        // Add this line to log the user back in
+                        Auth::login($user); 
                         
                         Log::info('Wallet recharged successfully', [
                             'user_id' => $user->id,

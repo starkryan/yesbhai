@@ -41,8 +41,8 @@ export default function Recharge() {
     
     // Validate amount
     const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount < 20) {
-      setError('Amount must be at least ₹20');
+    if (isNaN(parsedAmount) || parsedAmount < 1) {
+      setError('Amount must be at least ₹1');
       return;
     }
     
@@ -106,7 +106,7 @@ export default function Recharge() {
                     placeholder="Enter amount"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    min="20"
+                    min="1"
                     max="10000"
                     required
                   />
@@ -151,7 +151,7 @@ export default function Recharge() {
               </form>
             </CardContent>
             <CardFooter className="flex flex-col items-start text-xs ">
-              <p>• Minimum recharge amount: ₹20</p>
+              <p>• Minimum recharge amount: ₹1</p>
               <p>• Maximum recharge amount: ₹10,000</p>
               <p>• Payment will be processed securely</p>
               <div className="w-full flex justify-end mt-2">
