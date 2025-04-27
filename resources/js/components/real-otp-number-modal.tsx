@@ -382,7 +382,7 @@ export function RealOtpNumberModal({
                     <div>
                       <p className="text-sm font-medium">Waiting for SMS</p>
                       <p className="text-sm mt-1">
-                       Waiting for SMS
+                       waiting to receive the verification code
                       </p>
                     </div>
                     <div className="font-medium">
