@@ -150,7 +150,7 @@ export default function WalletTransactions() {
                     <Wallet className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">₹{availableBalance}</p>
+                    <p className="text-2xl font-bold">₹{(parseFloat(availableBalance) || 0).toFixed(2)}</p>
                     <p className="text-xs text-gray-500">Available to spend</p>
                   </div>
                 </div>
@@ -179,7 +179,7 @@ export default function WalletTransactions() {
                     <Clock className="h-5 w-5 text-yellow-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">₹{reservedBalance}</p>
+                    <p className="text-2xl font-bold">₹{(parseFloat(reservedBalance) || 0).toFixed(2)}</p>
                     <p className="text-xs text-gray-500">Reserved for pending OTPs</p>
                   </div>
                 </div>
@@ -189,7 +189,7 @@ export default function WalletTransactions() {
           
           <Card className="md:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Total Balance</CardTitle>
+              <CardTitle className="text-base">Total Recharge</CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -203,7 +203,7 @@ export default function WalletTransactions() {
                     <WalletCards className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">₹{walletBalance}</p>
+                    <p className="text-2xl font-bold">₹{(parseFloat(walletBalance) || 0).toFixed(2)}</p>
                     <p className="text-xs text-gray-500">Total wallet balance</p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export default function WalletTransactions() {
                         <TableCell className={`font-medium ${parseFloat(transaction.amount) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                           ₹{parseFloat(transaction.amount) < 0 
                               ? Math.abs(parseFloat(transaction.amount)).toFixed(2) 
-                              : transaction.amount}
+                              : parseFloat(transaction.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>{getTransactionTypeBadge(transaction.transaction_type, transaction.amount)}</TableCell>
                         <TableCell>{getStatusBadge(transaction.status)}</TableCell>

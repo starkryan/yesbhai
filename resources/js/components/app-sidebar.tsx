@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, LayoutGrid, CreditCard, History, Wallet } from 'lucide-react';
+import { BookOpen, LayoutGrid, CreditCard, History, Wallet, HelpCircle, Phone } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -22,6 +22,21 @@ const mainNavItems: NavItem[] = [
         title: 'Transactions',
         href: '/wallet-transactions',
         icon: Wallet,
+    },
+    {
+        title: 'Privacy',
+        href: '/privacy',
+        icon: BookOpen,
+    },
+    {
+        title: 'Support',
+        href: '/support',
+        icon: HelpCircle,
+    },
+    {
+        title: 'Telegram',
+        href: '/telegram',
+        icon: Phone,
     },
   
 ];

@@ -13,11 +13,12 @@ import { Menu, Wallet } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useInitials } from '@/hooks/use-initials';
 import { UserMenuContent } from '@/components/user-menu-content';
-import React from 'react';
+import React, { useState } from 'react';
 
 export function HomeHeader() {
   const { auth } = usePage<SharedData>().props;
   const getInitials = useInitials();
+  const [availableBalance, setAvailableBalance] = useState<string>('0.00');
 
   return (
     <header className="w-full border-b bg-background px-4 py-3 shadow-sm">
@@ -26,7 +27,7 @@ export function HomeHeader() {
         <div className="flex items-center gap-6">
           {/* Logo */}
           <Link href="/" className="text-xl font-semibold text-primary">
-            RealSim
+            OTPMaya
           </Link>
 
           {/* Desktop Nav */}
@@ -57,7 +58,7 @@ export function HomeHeader() {
                 {/* Wallet Balance */}
                 <div className="flex items-center gap-1 rounded-lg border bg-accent px-3 py-1.5">
                   <Wallet className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">₹{auth.user.wallet_balance || '0.00'}</span>
+                  <span className="text-sm font-medium">₹{availableBalance}</span>
                 </div>
                 
                 {/* User Menu */}

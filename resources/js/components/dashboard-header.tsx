@@ -25,11 +25,11 @@ export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrumb
     const fetchWalletBalance = async () => {
       try {
         const response = await axios.get('/api/wallet/transactions');
-        setAvailableBalance(
-          (response.data.available_balance || response.data.wallet_balance || '0.00').toFixed(2)
-        );
+        const balance = parseFloat(response.data.available_balance || response.data.wallet_balance || '0.00');
+        setAvailableBalance(balance.toFixed(2));
       } catch (err) {
-        console.error('Error fetching wallet balance:', err);
+        // Silent error - don't log to console
+        setAvailableBalance('0.00');
       }
     };
 

@@ -79,15 +79,18 @@ export function RealOtpNumberModal({
             try {
               // Try to extract the balance details from error message
               const errorData = JSON.parse(result.error);
-              if (errorData.current_balance !== undefined && errorData.required_price !== undefined) {
+              if (errorData && typeof errorData === 'object') {
                 setInsufficientBalance({
-                  current: errorData.current_balance,
-                  required: errorData.required_price
+                  current: typeof errorData.current_balance === 'number' 
+                    ? errorData.current_balance.toFixed(2) 
+                    : (errorData.current_balance || '0.00'),
+                  required: typeof errorData.required_price === 'string' 
+                    ? errorData.required_price 
+                    : (errorData.required_price?.toString() || '0.00')
                 });
               }
             } catch (e) {
-              // If we can't parse the error, just set the standard error message
-              // It will be handled by the error state in the hook
+              // do nothing
             }
           }
         });
@@ -280,7 +283,7 @@ export function RealOtpNumberModal({
             </div>
           )}
           
-          {error && (
+          {error && !error.includes('Insufficient wallet balance') && (
             <div className="bg-background border rounded-md p-4 flex items-start">
               <AlertCircle className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" />
               <div>
@@ -336,9 +339,9 @@ export function RealOtpNumberModal({
                   {insufficientBalance && (
                     <>
                       <br />
-                      Available Balance: ₹{insufficientBalance.current}
+                      Available Balance: ₹{parseFloat(insufficientBalance.current).toFixed(2)}
                       <br />
-                      Required Amount: ₹{insufficientBalance.required}
+                      Required Amount: ₹{parseFloat(insufficientBalance.required).toFixed(2)}
                     </>
                   )}
                 </p>

@@ -24,6 +24,21 @@ Route::post('/api/payment/webhook', [RechargeController::class, 'handleWebhook']
 Route::get('/recharge/public-result', [RechargeController::class, 'showPublicResult'])
     ->name('recharge.public.result');
 
+// Privacy Policy page - publicly accessible
+Route::get('/privacy', function () {
+    return Inertia::render('privacy');
+})->name('privacy');
+
+// Support page - publicly accessible
+Route::get('/support', function () {
+    return Inertia::render('support');
+})->name('support');
+
+// Telegram channel page - publicly accessible
+Route::get('/telegram', function () {
+    return Inertia::render('telegram');
+})->name('telegram');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [RealOtpController::class, 'dashboard'])->name('dashboard');
     

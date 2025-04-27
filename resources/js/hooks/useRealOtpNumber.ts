@@ -94,7 +94,7 @@ export function useRealOtpNumber() {
           }
         } catch (e) {
           // Ignore JSON parse errors
-          console.error("Error parsing persisted OTP state", e);
+          // console.error("Error parsing persisted OTP state", e);
         }
       }
     }
@@ -159,14 +159,14 @@ export function useRealOtpNumber() {
               }
             })
             .catch(err => {
-              console.error("Background OTP check failed", err);
+              // console.error("Background OTP check failed", err);
               // Update last checked timestamp even on error
               state.lastChecked = Date.now();
               localStorage.setItem(stateKey, JSON.stringify(state));
             });
         } catch (e) {
           // Handle JSON parse errors
-          console.error("Error parsing persisted OTP state", e);
+              // console.error("Error parsing persisted OTP state", e);
           localStorage.removeItem(stateKey);
         }
       } else {
@@ -208,7 +208,7 @@ export function useRealOtpNumber() {
         
         return true;
       } catch (e) {
-        console.error("Error loading persisted state", e);
+        // console.error("Error loading persisted state", e);
         localStorage.removeItem(stateKey);
       }
     }
@@ -224,36 +224,48 @@ export function useRealOtpNumber() {
       
       const serviceNameParam = params.service_name ? `&service_name=${encodeURIComponent(params.service_name)}` : '';
       const url = `/api/realotp/number?service_code=${encodeURIComponent(params.service_code)}&server_code=${encodeURIComponent(params.server_code)}${serviceNameParam}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
       
-      const data: RequestNumberResponse = await response.json();
-      
-      if (data.success && data.phone_number && data.order_id) {
-        setPhoneNumber(data.phone_number);
-        setOrderId(data.order_id);
-        setStatus('waiting');
-        return {
-          success: true,
-          phone_number: data.phone_number,
-          order_id: data.order_id
-        };
-      } else {
-        let errorMessage = data.message || 'Failed to request number';
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
         
-        // Special handling for insufficient balance
-        if (response.status === 403 && data.message && data.message.includes('Insufficient wallet balance')) {
-          errorMessage = JSON.stringify({
-            message: data.message,
-            current_balance: data.current_balance,
-            required_price: data.required_price
-          });
+        const data: RequestNumberResponse = await response.json();
+        
+        if (data.success && data.phone_number && data.order_id) {
+          setPhoneNumber(data.phone_number);
+          setOrderId(data.order_id);
+          setStatus('waiting');
+          return {
+            success: true,
+            phone_number: data.phone_number,
+            order_id: data.order_id
+          };
+        } else {
+          let errorMessage = data.message || 'Failed to request number';
+          
+          // Special handling for insufficient balance
+          if (response.status === 403 && data.message && data.message.includes('Insufficient wallet balance')) {
+            errorMessage = JSON.stringify({
+              message: 'Insufficient wallet balance',
+              current_balance: data.wallet_balance || data.current_balance || '0.00',
+              required_price: data.required_price || data.price || '0.00'
+            });
+          }
+          
+          setError(errorMessage);
+          setStatus('failed');
+          return {
+            success: false,
+            error: errorMessage
+          };
         }
-        
+      } catch (err) {
+        // Silent error - don't log to console
+        const errorMessage = 'Request failed. Please try again later.';
         setError(errorMessage);
         setStatus('failed');
         return {
@@ -261,14 +273,6 @@ export function useRealOtpNumber() {
           error: errorMessage
         };
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error requesting number';
-      setError(errorMessage);
-      setStatus('failed');
-      return {
-        success: false,
-        error: errorMessage
-      };
     } finally {
       setIsLoading(false);
     }
@@ -284,105 +288,99 @@ export function useRealOtpNumber() {
         setStatus('waiting');
       }
       
-      const url = `/api/realotp/status?order_id=${encodeURIComponent(orderId)}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
-      
-      const data: CheckStatusResponse = await response.json();
-      
-      // Reset retry count on successful response
-      setRetryCount(0);
-      setError(null);
-      
-      if (data.success) {
-        // Update phone number if available and not set yet
-        if (data.phone_number && !phoneNumber) {
-          setPhoneNumber(data.phone_number);
+      try {
+        const url = `/api/realotp/status?order_id=${encodeURIComponent(orderId)}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        const data: CheckStatusResponse = await response.json();
+        
+        // Reset retry count on successful response
+        setRetryCount(0);
+        setError(null);
+        
+        if (data.success) {
+          // Update phone number if available and not set yet
+          if (data.phone_number && !phoneNumber) {
+            setPhoneNumber(data.phone_number);
+          }
+          
+          if (data.status === 'completed' && data.verification_code) {
+            setVerificationCode(data.verification_code);
+            setStatus('completed');
+            
+            // Clean up persistent state if exists
+            localStorage.removeItem(createStateKey(orderId));
+            
+            // Clean up background check if exists
+            if (activeOtpChecks[orderId]) {
+              clearInterval(activeOtpChecks[orderId]);
+              delete activeOtpChecks[orderId];
+            }
+            
+            return {
+              success: true,
+              status: 'completed',
+              verification_code: data.verification_code
+            };
+          } else if (data.status === 'cancelled') {
+            setStatus('cancelled');
+            
+            // Clean up persistent state if exists
+            localStorage.removeItem(createStateKey(orderId));
+            
+            // Clean up background check if exists
+            if (activeOtpChecks[orderId]) {
+              clearInterval(activeOtpChecks[orderId]);
+              delete activeOtpChecks[orderId];
+            }
+            
+            return {
+              success: true,
+              status: 'cancelled'
+            };
+          } else if (data.status === 'waiting') {
+            // Continue wait mode
+            return {
+              success: true,
+              status: 'waiting'
+            };
+          }
         }
         
-        if (data.status === 'completed' && data.verification_code) {
-          setVerificationCode(data.verification_code);
-          setStatus('completed');
-          
-          // Clean up persistent state if exists
-          localStorage.removeItem(createStateKey(orderId));
-          
-          // Clean up background check if exists
-          if (activeOtpChecks[orderId]) {
-            clearInterval(activeOtpChecks[orderId]);
-            delete activeOtpChecks[orderId];
-          }
-          
-          return {
-            success: true,
-            status: 'completed',
-            verification_code: data.verification_code
-          };
-        } else if (data.status === 'cancelled') {
-          setStatus('cancelled');
-          
-          // Clean up persistent state if exists
-          localStorage.removeItem(createStateKey(orderId));
-          
-          // Clean up background check if exists
-          if (activeOtpChecks[orderId]) {
-            clearInterval(activeOtpChecks[orderId]);
-            delete activeOtpChecks[orderId];
-          }
-          
-          return {
-            success: true,
-            status: 'cancelled'
-          };
-        } else if (data.status === 'waiting') {
-          // If we're checking an existing order but don't have the phone number yet,
-          // try to extract it from the raw response if available
-          if (!phoneNumber && data.raw_response) {
-            try {
-              // Try to parse the raw response for phone number information
-              // This depends on the format of your API response
-              const regex = /\b(\d{10,15})\b/; // Match 10-15 digit phone numbers
-              const match = data.raw_response.match(regex);
-              if (match && match[1]) {
-                setPhoneNumber(match[1]);
-              }
-            } catch (e) {
-              // Ignore extraction errors
-            }
-          }
-          
-          setStatus('waiting');
-          return {
-            success: true,
-            status: 'waiting'
-          };
-        }
-      }
-      
-      setError(data.message || 'Failed to check status');
-      return {
-        success: false,
-        error: data.message
-      };
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error checking status';
-      
-      // Only show the error if we've exceeded max retries
-      if (retryCount >= MAX_RETRIES) {
+        // If we get here, something went wrong with the response
+        const errorMessage = data.message || 'Status check failed';
         setError(errorMessage);
+        
+        // Increment retry count
+        if (retryCount < MAX_RETRIES) {
+          setRetryCount(prev => prev + 1);
+        } else {
+          setStatus('failed');
+        }
+        
+        return {
+          success: false,
+          error: errorMessage
+        };
+      } catch (err) {
+        // Silent error - don't log to console
+        if (retryCount < MAX_RETRIES) {
+          setRetryCount(prev => prev + 1);
+        } else {
+          setStatus('failed');
+          setError('Network error, please try again');
+        }
+        
+        return {
+          success: false,
+          error: 'Network error'
+        };
       }
-      
-      // Increment retry count on error
-      setRetryCount(prev => prev + 1);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
     } finally {
       setIsLoading(false);
     }
@@ -391,22 +389,19 @@ export function useRealOtpNumber() {
   const cancelNumber = async (orderId: string) => {
     try {
       setIsLoading(true);
-      setError(null);
       
-      const url = `/api/realotp/cancel?order_id=${encodeURIComponent(orderId)}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
-      
-      const data: CancelNumberResponse = await response.json();
-      
-      if (data.success) {
-        setStatus('cancelled');
+      try {
+        const url = `/api/realotp/cancel?order_id=${encodeURIComponent(orderId)}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
         
-        // Clean up any persistent state
+        const data: CancelNumberResponse = await response.json();
+        
+        // Clean up persistent state if exists
         localStorage.removeItem(createStateKey(orderId));
         
         // Clean up background check if exists
@@ -415,25 +410,27 @@ export function useRealOtpNumber() {
           delete activeOtpChecks[orderId];
         }
         
-        return {
-          success: true,
-          message: data.message || 'Number cancelled successfully',
-        };
-      } else {
-        const errorMessage = data.message || 'Failed to cancel number';
+        if (data.success) {
+          setStatus('cancelled');
+          return { success: true };
+        } else {
+          setStatus('failed');
+          setError(data.message || 'Failed to cancel number');
+          return {
+            success: false,
+            error: data.message
+          };
+        }
+      } catch (err) {
+        // Silent error - don't log to console
+        setStatus('failed');
+        const errorMessage = 'Network error, please try again';
         setError(errorMessage);
         return {
           success: false,
           error: errorMessage
         };
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error cancelling number';
-      setError(errorMessage);
-      return {
-        success: false,
-        error: errorMessage
-      };
     } finally {
       setIsLoading(false);
     }

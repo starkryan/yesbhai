@@ -2,6 +2,8 @@
 
 import { Head } from '@inertiajs/react';
 import { HomeHeader } from '@/components/home-header';
+import { Button } from '@/components/ui/button';
+import { Link } from '@inertiajs/react';
 
 export default function Welcome() {
   return (
@@ -18,6 +20,13 @@ export default function Welcome() {
             <p className="mx-auto mt-3 max-w-md text-base text-gray-500 sm:text-lg md:mt-5 md:max-w-3xl md:text-xl">
               Get instant access to virtual phone numbers for OTP verification across various platforms and services.
             </p>
+          </div>
+          <div className="mt-10 flex justify-center">
+            <Link href="/dashboard">
+              <Button className="bg-primary  hover:bg-primary/90">
+                Get Started
+            </Button>
+          </Link>
           </div>
           
           {/* Features section */}
@@ -46,6 +55,8 @@ export default function Welcome() {
                   Get virtual phone numbers instantly for your verification needs.
                 </p>
               </div>
+
+             
               
               {/* Feature 2 */}
               <div className="rounded-lg border bg-card p-6 shadow-sm">

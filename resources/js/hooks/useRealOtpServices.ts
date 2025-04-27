@@ -45,7 +45,7 @@ export function useRealOtpServices() {
           setError(data.message || 'Failed to fetch services data');
         }
       } catch (err) {
-        console.error(err);
+        // console.error(err);
         setError('Error connecting to server. Please try again later.');
       } finally {
         setIsLoading(false);

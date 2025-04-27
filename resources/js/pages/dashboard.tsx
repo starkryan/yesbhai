@@ -6,6 +6,7 @@ import { UserOtpPurchases } from '@/components/user-otp-purchases';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search } from 'lucide-react';
+import  Comp303  from '@/components/comp-303';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -17,8 +18,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function Dashboard() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
+           
             <Head title="OTP Services Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
+                <Comp303 />
                 <div className="flex flex-col gap-1">
                     <h1 className="text-2xl font-bold tracking-tight">OTP Services Dashboard</h1>
                     <p className="text-sm text-gray-500">

@@ -121,7 +121,7 @@ export function UserOtpPurchases() {
         setError(data.message || 'Failed to fetch OTP purchases');
       }
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       setError('Error connecting to server. Please try again later.');
     } finally {
       setIsLoading(false);

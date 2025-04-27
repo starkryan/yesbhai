@@ -32,26 +32,9 @@ export default function Recharge() {
   const [amount, setAmount] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [walletBalance, setWalletBalance] = useState<string | null>(null);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
 
-  // Fetch wallet balance on component mount
-  useEffect(() => {
-    const fetchWalletBalance = async () => {
-      try {
-        const response = await axios.get('/api/wallet/transactions');
-        if (response.data.success) {
-          setWalletBalance(response.data.wallet_balance);
-        }
-      } catch (err) {
-        console.error('Error fetching wallet balance:', err);
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
 
-    fetchWalletBalance();
-  }, []);
+ 
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,17 +83,7 @@ export default function Recharge() {
             <p className="text-sm text-gray-500">
               Add funds to your wallet to use for OTP services
             </p>
-            {isLoadingBalance ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="text-sm text-gray-500">Loading balance...</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <Wallet className="h-4 w-4 text-primary" />
-                <span className="font-medium">₹{walletBalance || '0.00'}</span>
-              </div>
-            )}
+           
           </div>
         </div>
         
