@@ -339,7 +339,7 @@ export function RealOtpNumberModal({
                 </p>
                 {status === 'waiting' && remainingTime === 0 && (
                   <p className="text-sm mt-2">
-                    The SMS verification code didn't arrive within the expected time. 
+                    The SMS verification code didn't arrive. 
                     You can try requesting a new number.
                   </p>
                 )}
@@ -354,8 +354,6 @@ export function RealOtpNumberModal({
                 <p className="font-medium">Time expired</p>
                 <p className="text-sm mt-1">
                   The SMS verification code didn't arrive within the expected time.
-                  The service might be busy or the number may no longer be active.
-                  You can try requesting a new number.
                 </p>
               </div>
             </div>
