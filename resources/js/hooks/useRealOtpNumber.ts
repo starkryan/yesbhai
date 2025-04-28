@@ -38,6 +38,7 @@ interface PersistedState {
   serviceCode: string;
   serverCode: string;
   serviceName: string;
+  startTime?: number; // Make startTime optional to fix type issues
   lastChecked?: number;
 }
 
@@ -181,6 +182,7 @@ export function useRealOtpNumber() {
   const persistState = (otpOrderId: string, state: Omit<PersistedState, 'lastChecked'>) => {
     const persistedState: PersistedState = {
       ...state,
+      startTime: state.startTime || Date.now(), // Use provided startTime or current time
       lastChecked: Date.now()
     };
     
@@ -278,7 +280,7 @@ export function useRealOtpNumber() {
     }
   };
 
-  const checkStatus = async (orderId: string) => {
+  const checkStatus = async (orderId: string, isTimeout: boolean = false) => {
     try {
       setIsLoading(true);
       
@@ -289,13 +291,17 @@ export function useRealOtpNumber() {
       }
       
       try {
-        const url = `/api/realotp/status?order_id=${encodeURIComponent(orderId)}`;
+        const url = `/api/realotp/status?order_id=${encodeURIComponent(orderId)}${isTimeout ? '&timeout=true' : ''}`;
         const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
           }
         });
+        
+        if (!response.ok) {
+          throw new Error('API request failed');
+        }
         
         const data: CheckStatusResponse = await response.json();
         

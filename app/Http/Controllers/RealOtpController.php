@@ -277,6 +277,7 @@ class RealOtpController extends Controller
     public function getStatus(Request $request)
     {
         $orderId = $request->query('order_id');
+        $timeoutOccurred = $request->query('timeout') === 'true';
         
         if (!$orderId) {
             return response()->json([
@@ -321,6 +322,11 @@ class RealOtpController extends Controller
             ]);
         }
         
+        // If a timeout has occurred, automatically cancel the order and refund
+        if ($timeoutOccurred && $purchase->status === 'waiting') {
+            return $this->handleTimeout($orderId, $purchase);
+        }
+
         try {
             $apiKey = env('REAL_OTP_API_SECRET');
             $apiUrl = env('REAL_OTP_API_URL');
@@ -426,6 +432,137 @@ class RealOtpController extends Controller
                 'message' => 'Error checking OTP status: ' . $e->getMessage(),
                 'phone_number' => $purchase->phone_number,
             ]);
+        }
+    }
+    
+    /**
+     * Handle timeout for an OTP purchase
+     * 
+     * @param string $orderId
+     * @param \App\Models\OtpPurchase $purchase
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function handleTimeout($orderId, $purchase)
+    {
+        Log::info('OTP Timeout - Automatically cancelling order', ['order_id' => $orderId]);
+        
+        // Security check - verify purchase is not already cancelled or completed
+        if ($purchase->status !== 'waiting') {
+            Log::warning('Attempted to timeout process a non-waiting OTP purchase', [
+                'order_id' => $orderId, 
+                'current_status' => $purchase->status
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'status' => $purchase->status,
+                'message' => 'Order is already processed',
+                'phone_number' => $purchase->phone_number,
+            ]);
+        }
+        
+        try {
+            // Call the RealOTP API to cancel the number
+            $apiKey = env('REAL_OTP_API_SECRET');
+            $apiUrl = env('REAL_OTP_API_URL');
+            
+            $response = Http::timeout(20)->get($apiUrl, [
+                'api_key' => $apiKey,
+                'action' => 'setStatus',
+                'status' => '8', // Status code 8 for cancel
+                'id' => $orderId,
+            ]);
+            
+            $responseBody = $response->body();
+            Log::info('RealOTP timeout cancellation response', ['response' => $responseBody, 'order_id' => $orderId]);
+            
+            // Use a transaction to ensure all database operations happen atomically
+            DB::beginTransaction();
+            
+            try {
+                $user = $purchase->user;
+                
+                // Update purchase record to cancelled
+                $purchase->update([
+                    'status' => 'cancelled',
+                    'cancelled_at' => now(),
+                    'cancellation_reason' => 'Timeout - auto-cancelled'
+                ]);
+                
+                // Get the pending transaction for this order
+                $transaction = \App\Models\WalletTransaction::where('reference_id', $orderId)
+                    ->where('user_id', $user->id)
+                    ->where('status', 'pending')
+                    ->first();
+                
+                if ($transaction) {
+                    // Mark transaction as cancelled
+                    $transaction->update([
+                        'status' => 'cancelled',
+                    ]);
+                    
+                    // Release the reserved balance
+                    $price = abs($transaction->amount);
+                    $user->reserved_balance -= $price;
+                    $user->save();
+                    
+                    // Create a refund record
+                    \App\Models\WalletTransaction::create([
+                        'user_id' => $user->id,
+                        'amount' => $price, // Positive amount for refund
+                        'transaction_type' => 'refund',
+                        'description' => "Refund for timed-out OTP: {$purchase->service_name} (#{$orderId})",
+                        'reference_id' => $orderId,
+                        'status' => 'completed',
+                        'metadata' => json_encode([
+                            'original_transaction_id' => $transaction->id,
+                            'reason' => 'SMS timeout',
+                            'response' => $responseBody
+                        ]),
+                    ]);
+                    
+                    $refundMessage = "Your payment of ₹{$price} has been refunded due to SMS timeout.";
+                } else {
+                    $refundMessage = "No pending transaction found for this order.";
+                    Log::warning('No pending transaction found for timed-out OTP', [
+                        'order_id' => $orderId,
+                        'user_id' => $user->id
+                    ]);
+                }
+                
+                DB::commit();
+                
+                return response()->json([
+                    'success' => true,
+                    'status' => 'cancelled',
+                    'message' => 'Order automatically cancelled due to timeout. ' . $refundMessage,
+                    'phone_number' => $purchase->phone_number,
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('Error processing OTP timeout cancellation: ' . $e->getMessage(), [
+                    'order_id' => $orderId,
+                    'exception' => $e->getTraceAsString()
+                ]);
+                
+                // Return error but don't expose details to user
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to cancel the timed-out OTP and process refund.',
+                    'status' => 'failed'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error during OTP timeout cancellation API call: ' . $e->getMessage(), [
+                'order_id' => $orderId,
+                'exception' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel the timed-out OTP with the provider.',
+                'status' => 'failed'
+            ], 500);
         }
     }
     
@@ -827,11 +964,24 @@ class RealOtpController extends Controller
             'completed' => 0,
             'still_waiting' => 0,
             'errors' => 0,
+            'timed_out' => 0,
         ];
         
         foreach ($purchases as $purchase) {
             try {
                 $results['processed']++;
+                
+                // Check if the purchase has timed out (created more than 5 minutes ago)
+                if ($purchase->created_at && now()->diffInSeconds($purchase->created_at) > 300) {
+                    // Call our timeout handler to cancel and refund
+                    $timeoutResult = $this->handleTimeout($purchase->order_id, $purchase);
+                    if ($timeoutResult->status() === 200) {
+                        $results['timed_out']++;
+                    } else {
+                        $results['errors']++;
+                    }
+                    continue;
+                }
                 
                 // Only check orders every minute to avoid excessive API calls
                 if ($purchase->last_background_check && 
@@ -897,8 +1047,40 @@ class RealOtpController extends Controller
                     $purchase->background_monitoring = false; // No longer needs monitoring
                     $purchase->save();
                     
-                    // Handle refund logic (same as in getStatus method)
-                    // ...
+                    // Handle refund logic same as in cancelNumber method
+                    $user = $purchase->user;
+                    
+                    // Get the pending transaction for this order
+                    $transaction = \App\Models\WalletTransaction::where('reference_id', $purchase->order_id)
+                        ->where('user_id', $user->id)
+                        ->where('status', 'pending')
+                        ->first();
+                    
+                    if ($transaction) {
+                        // Mark transaction as cancelled
+                        $transaction->update([
+                            'status' => 'cancelled',
+                        ]);
+                        
+                        // Release the reserved balance
+                        $price = abs($transaction->amount);
+                        $user->reserved_balance -= $price;
+                        $user->save();
+                        
+                        // Create a refund record
+                        \App\Models\WalletTransaction::create([
+                            'user_id' => $user->id,
+                            'amount' => $price, // Positive amount for refund
+                            'transaction_type' => 'refund',
+                            'description' => "Refund for cancelled OTP: {$purchase->service_name} (#{$purchase->order_id})",
+                            'reference_id' => $purchase->order_id,
+                            'status' => 'completed',
+                            'metadata' => json_encode([
+                                'original_transaction_id' => $transaction->id,
+                                'reason' => 'Service cancelled'
+                            ]),
+                        ]);
+                    }
                 }
                 
             } catch (\Exception $e) {
