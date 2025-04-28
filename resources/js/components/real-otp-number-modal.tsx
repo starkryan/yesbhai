@@ -145,28 +145,21 @@ export function RealOtpNumberModal({
       
       setCheckInterval(interval);
       
-      // Only set up countdown if not already at zero
-      if (remainingTime > 0) {
-        const countdownInterval = setInterval(() => {
-          setRemainingTime(prev => {
-            if (prev <= 1) {
-              clearInterval(countdownInterval);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-        
-        return () => {
-          clearInterval(interval);
-          clearInterval(countdownInterval);
-        };
-      } else {
-        // If time already expired, just clear the check interval on unmount
-        return () => {
-          clearInterval(interval);
-        };
-      }
+      // Start countdown timer
+      const countdownInterval = setInterval(() => {
+        setRemainingTime(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => {
+        clearInterval(interval);
+        clearInterval(countdownInterval);
+      };
     }
     
     // If we get a verification code, stop checking
@@ -185,7 +178,7 @@ export function RealOtpNumberModal({
         });
       }
     }
-  }, [status, orderId, existingOrderId, verificationCode, open, serviceName, remainingTime]);
+  }, [status, orderId, existingOrderId, verificationCode, open, serviceName]);
   
   // Format time as minutes:seconds
   const formatTime = (seconds: number) => {
@@ -201,28 +194,6 @@ export function RealOtpNumberModal({
     setTimeout(() => setCopied(null), 2000);
   };
   
-  // Function to format phone number and extract country code
-  const formatPhoneNumber = (number: string) => {
-    // Identify common country codes (91 for India, etc.)
-    const countryCodeMatch = number.match(/^(91|1|44|61|7|86|49|33|39|55|52|81|92|380|966|20|234|27|63|65|66|84|62|60|351|31|48|54|64|351|972|82|90|971)/);
-    
-    if (countryCodeMatch) {
-      const countryCode = countryCodeMatch[1];
-      const nationalNumber = number.substring(countryCode.length);
-      return {
-        fullNumber: number,
-        countryCode,
-        nationalNumber
-      };
-    }
-    
-    return {
-      fullNumber: number,
-      countryCode: '',
-      nationalNumber: number
-    };
-  };
-  
   // Handle closing - now with option to keep monitoring in background
   const handleClose = () => {
     // Stop UI update intervals but don't reset state
@@ -233,21 +204,13 @@ export function RealOtpNumberModal({
     
     // Persist current state so it can be resumed
     if (orderId && status === 'waiting') {
-      // Create the state object with the required properties
-      const stateToSave = {
+      // We need to preserve the original startTime when persisting
+      persistState(orderId, {
         phoneNumber,
         serviceCode,
         serverCode,
         serviceName
-      };
-      
-      // Add startTime if available
-      if (startTime !== null) {
-        Object.assign(stateToSave, { startTime });
-      }
-      
-      // Persist the state
-      persistState(orderId, stateToSave);
+      });
       
       toast.info("OTP Request Active", {
         description: "We'll continue monitoring your OTP in the background.",
@@ -436,40 +399,19 @@ export function RealOtpNumberModal({
           {phoneNumber && (
             <div className="space-y-4">
               <div className="bg-background border rounded-md p-4">
-                <div className="flex flex-col">
-                  <div className="flex justify-between items-center mb-2">
+                <div className="flex justify-between items-center">
+                  <div>
                     <p className="text-sm font-medium">Phone Number</p>
-                    <div className="flex gap-2">
-                      {phoneNumber.startsWith('91') && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => copyToClipboard(phoneNumber.substring(2), 'phone')}
-                          title="Copy without country code"
-                          className="h-8 px-2"
-                        >
-                          {copied === 'phone' ? <CheckCircle className="h-4 w-4" /> : <span className="text-xs">Copy w/o +91</span>}
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => copyToClipboard(phoneNumber, 'phone')}
-                        title="Copy full number"
-                        className="h-8"
-                      >
-                        {copied === 'phone' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    </div>
+                    <p className="text-xl font-bold mt-1">{phoneNumber}</p>
                   </div>
-                  <p className="text-xl font-bold">
-                    {phoneNumber.startsWith('91') ? (
-                      <>
-                        <span className="text-gray-500">+91 </span>
-                        {phoneNumber.substring(2)}
-                      </>
-                    ) : phoneNumber}
-                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => copyToClipboard(phoneNumber, 'phone')}
+                    className="h-8"
+                  >
+                    {copied === 'phone' ? <CheckCircle className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
                 </div>
               </div>
               
@@ -479,23 +421,21 @@ export function RealOtpNumberModal({
                     <div>
                       <p className="text-sm font-medium">Waiting for SMS</p>
                       <p className="text-sm mt-1">
-                        {remainingTime <= 30 ? 
-                          <span className="text-amber-600 font-medium">Almost out of time! Waiting for code...</span> : 
-                          "Waiting to receive the verification code"}
+                       waiting to receive the verification code
                       </p>
                     </div>
-                    <div className={`font-medium ${remainingTime <= 30 ? 'text-amber-600' : ''}`}>
+                    <div className="font-medium">
                       {formatTime(remainingTime)}
                     </div>
                   </div>
                   <div className="mt-3 w-full bg-secondary rounded-full h-1.5">
                     <div 
-                      className={`h-1.5 rounded-full ${remainingTime <= 30 ? 'bg-amber-500 animate-pulse' : 'bg-primary'}`}
+                      className="bg-primary h-1.5 rounded-full" 
                       style={{ width: `${(remainingTime / 300) * 100}%` }}
                     ></div>
                   </div>
                   <div className="mt-3 text-xs text-gray-500">
-                    You can close this modal and we'll continue monitoring your OTP in the background. The timer will resume correctly when you come back.
+                    You can close this modal and we'll continue checking for your code in the background.
                   </div>
                 </div>
               )}

@@ -446,21 +446,6 @@ class RealOtpController extends Controller
     {
         Log::info('OTP Timeout - Automatically cancelling order', ['order_id' => $orderId]);
         
-        // Security check - verify purchase is not already cancelled or completed
-        if ($purchase->status !== 'waiting') {
-            Log::warning('Attempted to timeout process a non-waiting OTP purchase', [
-                'order_id' => $orderId, 
-                'current_status' => $purchase->status
-            ]);
-            
-            return response()->json([
-                'success' => true,
-                'status' => $purchase->status,
-                'message' => 'Order is already processed',
-                'phone_number' => $purchase->phone_number,
-            ]);
-        }
-        
         try {
             // Call the RealOTP API to cancel the number
             $apiKey = env('REAL_OTP_API_SECRET');
@@ -476,7 +461,6 @@ class RealOtpController extends Controller
             $responseBody = $response->body();
             Log::info('RealOTP timeout cancellation response', ['response' => $responseBody, 'order_id' => $orderId]);
             
-            // Use a transaction to ensure all database operations happen atomically
             DB::beginTransaction();
             
             try {
@@ -486,7 +470,6 @@ class RealOtpController extends Controller
                 $purchase->update([
                     'status' => 'cancelled',
                     'cancelled_at' => now(),
-                    'cancellation_reason' => 'Timeout - auto-cancelled'
                 ]);
                 
                 // Get the pending transaction for this order
@@ -516,17 +499,8 @@ class RealOtpController extends Controller
                         'status' => 'completed',
                         'metadata' => json_encode([
                             'original_transaction_id' => $transaction->id,
-                            'reason' => 'SMS timeout',
-                            'response' => $responseBody
+                            'reason' => 'SMS timeout'
                         ]),
-                    ]);
-                    
-                    $refundMessage = "Your payment of ₹{$price} has been refunded due to SMS timeout.";
-                } else {
-                    $refundMessage = "No pending transaction found for this order.";
-                    Log::warning('No pending transaction found for timed-out OTP', [
-                        'order_id' => $orderId,
-                        'user_id' => $user->id
                     ]);
                 }
                 
@@ -535,15 +509,12 @@ class RealOtpController extends Controller
                 return response()->json([
                     'success' => true,
                     'status' => 'cancelled',
-                    'message' => 'Order automatically cancelled due to timeout. ' . $refundMessage,
+                    'message' => 'Order automatically cancelled due to timeout and balance refunded',
                     'phone_number' => $purchase->phone_number,
                 ]);
             } catch (\Exception $e) {
                 DB::rollBack();
-                Log::error('Error processing OTP timeout cancellation: ' . $e->getMessage(), [
-                    'order_id' => $orderId,
-                    'exception' => $e->getTraceAsString()
-                ]);
+                Log::error('Error processing OTP timeout cancellation: ' . $e->getMessage());
                 
                 // Return error but don't expose details to user
                 return response()->json([
@@ -553,10 +524,7 @@ class RealOtpController extends Controller
                 ], 500);
             }
         } catch (\Exception $e) {
-            Log::error('Error during OTP timeout cancellation API call: ' . $e->getMessage(), [
-                'order_id' => $orderId,
-                'exception' => $e->getTraceAsString()
-            ]);
+            Log::error('Error during OTP timeout cancellation API call: ' . $e->getMessage());
             
             return response()->json([
                 'success' => false,

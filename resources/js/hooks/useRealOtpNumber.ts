@@ -38,7 +38,7 @@ interface PersistedState {
   serviceCode: string;
   serverCode: string;
   serviceName: string;
-  startTime?: number; // Make startTime optional to fix type issues
+  startTime: number; // When the OTP was initially requested
   lastChecked?: number;
 }
 
@@ -179,10 +179,10 @@ export function useRealOtpNumber() {
   };
 
   // Persist current OTP state so it can be continued in the background
-  const persistState = (otpOrderId: string, state: Omit<PersistedState, 'lastChecked'>) => {
+  const persistState = (otpOrderId: string, state: Omit<PersistedState, 'lastChecked' | 'startTime'>) => {
     const persistedState: PersistedState = {
       ...state,
-      startTime: state.startTime || Date.now(), // Use provided startTime or current time
+      startTime: Date.now(), // Record when the OTP was initially requested
       lastChecked: Date.now()
     };
     
