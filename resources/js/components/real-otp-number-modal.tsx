@@ -189,7 +189,12 @@ export function RealOtpNumberModal({
   
   // Copy text to clipboard
   const copyToClipboard = (text: string, type: 'phone' | 'code') => {
-    navigator.clipboard.writeText(text);
+    // For phone numbers, strip the country code (91) if present
+    let textToCopy = text;
+    if (type === 'phone' && text.startsWith('91')) {
+      textToCopy = text.substring(2); // Remove the first two characters (91)
+    }
+    navigator.clipboard.writeText(textToCopy);
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
   };

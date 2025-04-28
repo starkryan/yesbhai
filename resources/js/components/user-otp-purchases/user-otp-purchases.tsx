@@ -129,7 +129,12 @@ export function UserOtpPurchases() {
   };
 
   const copyToClipboard = (text: string, id: number, field: 'phone' | 'code') => {
-    navigator.clipboard.writeText(text);
+    // For phone numbers, strip the country code (91) if present
+    let textToCopy = text;
+    if (field === 'phone' && text.startsWith('91')) {
+      textToCopy = text.substring(2); // Remove the first two characters (91)
+    }
+    navigator.clipboard.writeText(textToCopy);
     setCopied({ id, field });
     setTimeout(() => setCopied(null), 2000);
   };
