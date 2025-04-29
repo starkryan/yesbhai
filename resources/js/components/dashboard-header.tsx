@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UserMenuContent } from '@/components/user-menu-content';
-import { Wallet } from 'lucide-react';
+import { Wallet, PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from '@inertiajs/react';
@@ -50,10 +50,10 @@ export function DashboardHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrumb
       <div className="flex items-center gap-2 md:gap-3">
         {auth.user && (
           <div className="flex items-center gap-2 rounded-lg border bg-accent px-2 py-1.5 md:px-3">
-            <Wallet className="h-4 w-4 text-primary" />
+            
             <span className="text-xs font-medium md:text-sm">₹{availableBalance}</span>
             <Link href="/recharge" className="text-[10px] font-semibold md:text-xs hover:underline text-red-400">
-              Recharge
+             <PlusCircle className="h-4 w-4 text-primary" />
             </Link>
           </div>
         )}

@@ -24,9 +24,11 @@ class RealOtpController extends Controller
         try {
             // Check if we have cached data first
             if (Cache::has('realotp_services')) {
+                $data = Cache::get('realotp_services');
+                $data = $this->applyCommissionMarkup($data);
                 return response()->json([
                     'success' => true,
-                    'data' => Cache::get('realotp_services'),
+                    'data' => $data,
                     'source' => 'cache'
                 ]);
             }
@@ -42,6 +44,9 @@ class RealOtpController extends Controller
             
             if ($response->successful()) {
                 $data = $response->json();
+                
+                // Apply commission markup before caching
+                $data = $this->applyCommissionMarkup($data);
                 
                 // Cache the successful response for 30 minutes
                 Cache::put('realotp_services', $data, now()->addMinutes(30));
@@ -807,6 +812,33 @@ class RealOtpController extends Controller
     }
 
     /**
+     * Apply 30% commission markup to all service prices
+     */
+    protected function applyCommissionMarkup($services)
+    {
+        if (!is_array($services)) {
+            return $services;
+        }
+
+        foreach ($services as $serviceName => &$serviceItems) {
+            if (!is_array($serviceItems)) {
+                continue;
+            }
+
+            foreach ($serviceItems as &$item) {
+                if (isset($item['price'])) {
+                    // Convert price to float, apply markup, and round to 2 decimal places
+                    $originalPrice = (float) $item['price'];
+                    $markupPrice = $originalPrice * 1.30; // 30% markup
+                    $item['price'] = number_format($markupPrice, 2, '.', '');
+                }
+            }
+        }
+
+        return $services;
+    }
+
+    /**
      * Get price for a specific service and server
      */
     protected function getServicePrice($serviceCode, $serverCode)
@@ -827,6 +859,9 @@ class RealOtpController extends Controller
         if (!$services) {
             $services = $this->getSampleData();
         }
+
+        // Apply commission markup to the services before searching
+        $services = $this->applyCommissionMarkup($services);
         
         // Search for the price
         foreach ($services as $serviceName => $serviceItems) {

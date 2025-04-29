@@ -233,19 +233,17 @@ export default function WalletTransactions() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Order ID</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {transactions.map((transaction) => (
                       <TableRow key={transaction.id}>
-                        <TableCell>{formatDate(transaction.created_at)}</TableCell>
-                        <TableCell>{transaction.description}</TableCell>
                         <TableCell className={`font-medium ${parseFloat(transaction.amount) < 0 ? 'text-red-600' : 'text-green-600'}`}>
                           ₹{parseFloat(transaction.amount) < 0 
                               ? Math.abs(parseFloat(transaction.amount)).toFixed(2) 
@@ -254,6 +252,8 @@ export default function WalletTransactions() {
                         <TableCell>{getTransactionTypeBadge(transaction.transaction_type, transaction.amount)}</TableCell>
                         <TableCell>{getStatusBadge(transaction.status)}</TableCell>
                         <TableCell className="font-mono text-xs">{transaction.order_id}</TableCell>
+                        <TableCell>{formatDate(transaction.created_at)}</TableCell>
+                        <TableCell>{transaction.description}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
