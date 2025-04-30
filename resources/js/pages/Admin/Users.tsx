@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
+import { Head, useForm as useInertiaForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import {
@@ -25,7 +26,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -48,9 +48,10 @@ import { Button } from '@/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Loader2, Plus, Minus } from 'lucide-react';
+import { Loader2, Plus, Minus, Search } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { debounce } from 'lodash';
 
 interface User {
   id: number;
@@ -62,8 +63,45 @@ interface User {
   created_at: string;
 }
 
+interface PaginationLinks {
+  first_page_url: string;
+  last_page_url: string;
+  next_page_url: string | null;
+  prev_page_url: string | null;
+  path: string;
+}
+
+interface PaginationMeta {
+  current_page: number;
+  from: number;
+  last_page: number;
+  links: Array<{
+    url: string | null;
+    label: string;
+    active: boolean;
+  }>;
+  path: string;
+  per_page: number;
+  to: number;
+  total: number;
+}
+
 interface UsersPageProps {
-  users: User[];
+  users: {
+    data: User[];
+    links: PaginationLinks;
+    meta?: PaginationMeta;
+    current_page: number;
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+  };
+  filters: {
+    search: string;
+    perPage: number;
+  };
 }
 
 const formSchema = z.object({
@@ -93,10 +131,17 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-export default function Users({ users }: UsersPageProps) {
+export default function Users({ users, filters }: UsersPageProps) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(filters.search);
+  const [perPage, setPerPage] = useState(filters.perPage.toString());
+
+  const { data, setData, get } = useInertiaForm({
+    search: filters.search,
+    perPage: filters.perPage,
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -106,6 +151,40 @@ export default function Users({ users }: UsersPageProps) {
       description: '',
     },
   });
+
+  // Debounced search function
+  const debouncedSearch = debounce(() => {
+    router.get('/admin/users', { search: searchQuery, perPage: perPage }, { preserveState: true });
+  }, 300);
+
+  // Effect to handle search debounce
+  useEffect(() => {
+    debouncedSearch();
+    return () => debouncedSearch.cancel();
+  }, [searchQuery]);
+
+  // Handle per page change
+  const handlePerPageChange = (value: string) => {
+    setPerPage(value);
+    router.get('/admin/users', { search: searchQuery, perPage: parseInt(value) }, { preserveState: true });
+  };
+
+  // Handle pagination click
+  const handlePaginationClick = (url: string) => {
+    if (!url) return;
+    
+    // Extract page number from URL
+    const urlParams = new URLSearchParams(url.split('?')[1]);
+    const page = urlParams.get('page');
+    
+    if (page) {
+      router.get('/admin/users', { 
+        search: searchQuery, 
+        perPage: perPage,
+        page: page 
+      }, { preserveState: true });
+    }
+  };
 
   const handleManageBalance = (user: User) => {
     setSelectedUser(user);
@@ -126,20 +205,9 @@ export default function Users({ users }: UsersPageProps) {
       
       if (response.data.success) {
         toast.success('Balance updated successfully');
-        // Update the user's balance in the UI
-        const updatedUsers = users.map(user => {
-          if (user.id === selectedUser.id) {
-            return {
-              ...user,
-              wallet_balance: response.data.current_balance,
-            };
-          }
-          return user;
-        });
-        
         // Close the dialog
         setIsOpen(false);
-        // You would typically reload or update the page here
+        // Reload the page
         window.location.reload();
       }
     } catch (error) {
@@ -176,6 +244,34 @@ export default function Users({ users }: UsersPageProps) {
             <CardDescription>
               View all registered users and manage their wallet balances
             </CardDescription>
+            
+            <div className="mt-4 flex flex-col sm:flex-row gap-4 justify-between">
+              <div className="relative max-w-md">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by name, email or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show:</span>
+                <Select value={perPage} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -194,38 +290,85 @@ export default function Users({ users }: UsersPageProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.id}</TableCell>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        {user.role === 'admin' ? (
-                          <Badge className="bg-purple-500">Admin</Badge>
-                        ) : (
-                          <Badge variant="outline">User</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>₹{parseFloat(user.wallet_balance).toFixed(2)}</TableCell>
-                      <TableCell>₹{parseFloat(user.reserved_balance).toFixed(2)}</TableCell>
-                      <TableCell>
-                        ₹{(parseFloat(user.wallet_balance) - parseFloat(user.reserved_balance)).toFixed(2)}
-                      </TableCell>
-                      <TableCell>{formatDate(user.created_at)}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleManageBalance(user)}
-                        >
-                          Manage Balance
-                        </Button>
+                  {users.data && users.data.length > 0 ? (
+                    users.data.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>{user.id}</TableCell>
+                        <TableCell className="font-medium">{user.name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          {user.role === 'admin' ? (
+                            <Badge className="bg-purple-500">Admin</Badge>
+                          ) : (
+                            <Badge variant="outline">User</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>₹{parseFloat(user.wallet_balance).toFixed(2)}</TableCell>
+                        <TableCell>₹{parseFloat(user.reserved_balance).toFixed(2)}</TableCell>
+                        <TableCell>
+                          ₹{(parseFloat(user.wallet_balance) - parseFloat(user.reserved_balance)).toFixed(2)}
+                        </TableCell>
+                        <TableCell>{formatDate(user.created_at)}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleManageBalance(user)}
+                          >
+                            Manage Balance
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-4">
+                        No users found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
+            
+            {/* Pagination */}
+            {users.last_page > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-gray-500">
+                  Showing {users.from} to {users.to} of {users.total} users
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePaginationClick(users.links.prev_page_url || '')}
+                    disabled={!users.links.prev_page_url}
+                  >
+                    Previous
+                  </Button>
+                  
+                  {users.links && Array.from({ length: users.last_page }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={page === users.current_page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePaginationClick(`${users.links.path}?page=${page}`)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePaginationClick(users.links.next_page_url || '')}
+                    disabled={!users.links.next_page_url}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

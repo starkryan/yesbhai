@@ -14,14 +14,31 @@ class UserController extends Controller
     /**
      * Display a listing of users.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::select('id', 'name', 'email', 'role', 'wallet_balance', 'reserved_balance', 'created_at')
-                    ->orderBy('id')
-                    ->get();
+        $search = $request->input('search', '');
+        $perPage = (int) $request->input('perPage', 10);
+        
+        $usersQuery = User::select('id', 'name', 'email', 'role', 'wallet_balance', 'reserved_balance', 'created_at');
+        
+        // Apply search if provided
+        if ($search) {
+            $usersQuery->where(function($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('id', 'like', "%{$search}%");
+            });
+        }
+        
+        // Paginate the results
+        $users = $usersQuery->orderBy('id')->paginate($perPage);
                     
         return Inertia::render('Admin/Users', [
-            'users' => $users
+            'users' => $users,
+            'filters' => [
+                'search' => $search,
+                'perPage' => $perPage
+            ]
         ]);
     }
     
