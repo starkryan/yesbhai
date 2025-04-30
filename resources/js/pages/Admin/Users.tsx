@@ -48,10 +48,16 @@ import { Button } from '@/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Loader2, Plus, Minus, Search } from 'lucide-react';
+import { Loader2, Plus, Minus, Search, Menu, MoreVertical, UserCircle, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface User {
   id: number;
@@ -227,6 +233,61 @@ export default function Users({ users, filters }: UsersPageProps) {
     return new Date(dateString).toLocaleDateString('en-IN', options);
   };
 
+  // Mobile card view component
+  const UserMobileCard = ({ user }: { user: User }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <UserCircle className="h-8 w-8 text-gray-400" />
+          <div>
+            <h3 className="font-medium">{user.name}</h3>
+            <p className="text-sm text-gray-500">{user.email}</p>
+          </div>
+        </div>
+        <div>
+          {user.role === 'admin' ? (
+            <Badge className="bg-purple-500">Admin</Badge>
+          ) : (
+            <Badge variant="outline">User</Badge>
+          )}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500">Wallet Balance</span>
+          <span className="font-medium">₹{parseFloat(user.wallet_balance).toFixed(2)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500">Reserved</span>
+          <span className="font-medium">₹{parseFloat(user.reserved_balance).toFixed(2)}</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500">Available</span>
+          <span className="font-semibold text-green-600">
+            ₹{(parseFloat(user.wallet_balance) - parseFloat(user.reserved_balance)).toFixed(2)}
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-xs text-gray-500">Created On</span>
+          <span className="font-medium">{formatDate(user.created_at)}</span>
+        </div>
+      </div>
+      
+      <div className="mt-3 flex justify-end">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => handleManageBalance(user)}
+          className="w-full"
+        >
+          <Wallet className="h-4 w-4 mr-2" />
+          Manage Balance
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Admin - Manage Users" />
@@ -246,19 +307,19 @@ export default function Users({ users, filters }: UsersPageProps) {
             </CardDescription>
             
             <div className="mt-4 flex flex-col sm:flex-row gap-4 justify-between">
-              <div className="relative max-w-md">
+              <div className="relative w-full sm:max-w-md">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
                   placeholder="Search by name, email or ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 w-full"
                 />
               </div>
               
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Show:</span>
+                <span className="text-sm text-gray-500 whitespace-nowrap">Show:</span>
                 <Select value={perPage} onValueChange={handlePerPageChange}>
                   <SelectTrigger className="w-[80px]">
                     <SelectValue placeholder="10" />
@@ -274,7 +335,23 @@ export default function Users({ users, filters }: UsersPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile View */}
+            <div className="block md:hidden">
+              {users.data && users.data.length > 0 ? (
+                <div className="space-y-4">
+                  {users.data.map((user) => (
+                    <UserMobileCard key={user.id} user={user} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+                  No users found
+                </div>
+              )}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -333,11 +410,11 @@ export default function Users({ users, filters }: UsersPageProps) {
             
             {/* Pagination */}
             {users.last_page > 1 && (
-              <div className="flex items-center justify-between mt-6">
-                <div className="text-sm text-gray-500">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mt-6">
+                <div className="text-sm text-gray-500 text-center sm:text-left">
                   Showing {users.from} to {users.to} of {users.total} users
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -347,16 +424,25 @@ export default function Users({ users, filters }: UsersPageProps) {
                     Previous
                   </Button>
                   
-                  {users.links && Array.from({ length: users.last_page }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={page === users.current_page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePaginationClick(`${users.links.path}?page=${page}`)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
+                  <div className="hidden sm:flex items-center space-x-1">
+                    {users.links && Array.from({ length: users.last_page }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={page === users.current_page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePaginationClick(`${users.links.path}?page=${page}`)}
+                        className="w-9"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <div className="sm:hidden flex items-center">
+                    <span className="px-2 text-sm">
+                      Page {users.current_page} of {users.last_page}
+                    </span>
+                  </div>
                   
                   <Button
                     variant="outline"
@@ -374,7 +460,7 @@ export default function Users({ users, filters }: UsersPageProps) {
       </div>
       
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] p-4 sm:p-6 w-[calc(100%-2rem)] max-w-lg mx-auto">
           <DialogHeader>
             <DialogTitle>Manage Wallet Balance</DialogTitle>
             <DialogDescription>
@@ -471,16 +557,21 @@ export default function Users({ users, filters }: UsersPageProps) {
                     )}
                   />
                   
-                  <DialogFooter>
+                  <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-2">
                     <Button 
                       type="button" 
                       variant="outline" 
                       onClick={() => setIsOpen(false)}
                       disabled={isSubmitting}
+                      className="sm:order-1 w-full sm:w-auto"
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="sm:order-2 w-full sm:w-auto"
+                    >
                       {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Confirm
                     </Button>
