@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\RealOtpController;
 use App\Http\Controllers\RechargeController;
 use App\Http\Controllers\WalletController;
+use App\Http\Middleware\AdminMiddleware;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -59,6 +61,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Wallet Routes
     Route::get('/wallet-transactions', [WalletController::class, 'index'])->name('wallet.transactions');
     Route::get('/api/wallet/transactions', [WalletController::class, 'getTransactions'])->name('wallet.get-transactions');
+    
+    // Admin Routes
+    Route::middleware([AdminMiddleware::class])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users');
+    });
+
+    // Admin API Routes
+    Route::middleware(['auth', 'verified', AdminMiddleware::class])->group(function () {
+        Route::post('/api/admin/users/{user}/balance', [AdminUserController::class, 'updateBalance'])->name('admin.users.update-balance');
+    });
 });
 
 require __DIR__.'/settings.php';

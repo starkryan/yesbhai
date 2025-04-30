@@ -20,6 +20,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'role',
         'wallet_balance',
         'reserved_balance',
         'password',
@@ -48,6 +49,16 @@ class User extends Authenticatable
             'wallet_balance' => 'decimal:2',
             'reserved_balance' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Check if the user is an admin.
+     *
+     * @return bool
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 
     /**
