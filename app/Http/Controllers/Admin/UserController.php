@@ -71,11 +71,15 @@ class UserController extends Controller
             if ($type === 'add') {
                 $user->wallet_balance += $amount;
             } else {
-                // Verify user has enough balance for deduction
-                if ($user->wallet_balance < $amount) {
+                // Verify user has enough balance for deduction, considering reserved balance
+                $availableBalance = $user->wallet_balance - $user->reserved_balance;
+                if ($availableBalance < $amount) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'User does not have sufficient balance.',
+                        'message' => 'User does not have sufficient available balance. They have ongoing transactions with reserved funds.',
+                        'wallet_balance' => $user->wallet_balance,
+                        'reserved_balance' => $user->reserved_balance,
+                        'available_balance' => $availableBalance,
                     ], 400);
                 }
                 $user->wallet_balance -= $amount;
@@ -88,10 +92,10 @@ class UserController extends Controller
             WalletTransaction::create([
                 'user_id' => $user->id,
                 'amount' => $transactionAmount,
-                'status' => 'COMPLETED',
+                'status' => 'completed',
                 'transaction_type' => 'adjustment',
                 'description' => $description,
-                'order_id' => 'ADM' . time() . rand(1000, 9999),
+                'reference_id' => 'ADM' . time() . rand(1000, 9999),
             ]);
             
             DB::commit();
@@ -100,6 +104,7 @@ class UserController extends Controller
                 'success' => true,
                 'message' => 'Balance updated successfully.',
                 'current_balance' => $user->wallet_balance,
+                'available_balance' => $user->wallet_balance - $user->reserved_balance,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

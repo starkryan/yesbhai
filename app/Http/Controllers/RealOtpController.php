@@ -369,6 +369,13 @@ class RealOtpController extends Controller
                     if ($transaction) {
                         $transaction->status = 'completed';
                         $transaction->save();
+                        
+                        // Actually deduct from wallet balance and release reservation
+                        $price = abs($transaction->amount);
+                        $user = $purchase->user;
+                        $user->wallet_balance -= $price;
+                        $user->reserved_balance -= $price;
+                        $user->save();
                     }
                     
                     return response()->json([
@@ -1031,12 +1038,19 @@ class RealOtpController extends Controller
                         if ($transaction) {
                             $transaction->status = 'completed';
                             $transaction->save();
+                            
+                            // Actually deduct from wallet balance and release reservation
+                            $price = abs($transaction->amount);
+                            $user = $purchase->user;
+                            $user->wallet_balance -= $price;
+                            $user->reserved_balance -= $price;
+                            $user->save();
+                            
+                            // Todo: Send notification to user about the completed OTP
+                            // This could be via email, SMS, or push notification
+                            
+                            $results['completed']++;
                         }
-                        
-                        // Todo: Send notification to user about the completed OTP
-                        // This could be via email, SMS, or push notification
-                        
-                        $results['completed']++;
                     }
                 }
                 // Check for waiting status - just update last check time
