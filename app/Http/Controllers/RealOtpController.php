@@ -415,8 +415,37 @@ class RealOtpController extends Controller
                         ->first();
                     
                     if ($transaction) {
-                        $transaction->status = 'cancelled';
-                        $transaction->save();
+                        // Wrap refund logic in DB transaction
+                        DB::beginTransaction();
+                        try {
+                            // Mark transaction as cancelled
+                            $transaction->update([
+                                'status' => 'cancelled',
+                            ]);
+                            
+                            // Release the reserved balance
+                            $user->reserved_balance -= $price;
+                            $user->save();
+                            
+                            // Create a refund record
+                            \App\Models\WalletTransaction::create([
+                                'user_id' => $user->id,
+                                'amount' => $price, // Positive amount for refund
+                                'transaction_type' => 'refund',
+                                'description' => "Refund for cancelled/expired OTP: {$purchase->service_name} (#{$purchase->order_id})",
+                                'reference_id' => $purchase->order_id,
+                                'status' => 'completed',
+                                'metadata' => json_encode([
+                                    'original_transaction_id' => $transaction->id,
+                                    'reason' => 'Service cancelled/expired'
+                                ]),
+                            ]);
+                            DB::commit();
+                        } catch (\Exception $e) {
+                            DB::rollBack();
+                            Log::error('Error processing OTP cancellation refund in getStatus: ' . $e->getMessage(), ['order_id' => $orderId]);
+                            // If refund fails, we still return cancelled status, but log the error
+                        }
                     }
                 }
                 

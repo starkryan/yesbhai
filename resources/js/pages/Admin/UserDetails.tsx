@@ -121,9 +121,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
 
         setError(null);
       } catch (err) {
-        console.error('Error fetching user details:', err);
-        setError('Failed to load user details. Please try again.');
-        toast.error('Failed to load user details');
+        setError('Failed to load user details. Please try again later.');
       } finally {
         setIsLoading(false);
       }

@@ -75,8 +75,8 @@ export function RealOtpNumberModal({
           }
         }
       } catch (e) {
-        // If there's an error, just use the default time
-        console.error("Error loading persisted timer state", e);
+        // Set a default start time if parsing fails
+        setStartTime(Date.now());
       }
       
       // Then check for status update from the server

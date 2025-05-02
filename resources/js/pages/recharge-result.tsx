@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CircleCheck, CircleX, RotateCw, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 interface RechargeResultProps {
   status: 'success' | 'failed' | 'error' | 'pending';
@@ -39,12 +40,15 @@ export default function RechargeResult({ status, message, amount, orderId }: Rec
   const [isChecking, setIsChecking] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const [currentMessage, setCurrentMessage] = useState(message);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Function to check order status
   const checkOrderStatus = async () => {
     if (!orderId) return;
     
     setIsChecking(true);
+    setIsLoading(true);
     try {
       const response = await axios.post('/api/recharge/check-status', { order_id: orderId });
       if (response.data.success) {
@@ -57,7 +61,9 @@ export default function RechargeResult({ status, message, amount, orderId }: Rec
         }
       }
     } catch (error) {
-      console.error('Failed to check order status', error);
+      setIsLoading(false);
+      setErrorMessage('Failed to check status. Please try again later.');
+      toast.error("Error", { description: "Could not verify payment status." });
     } finally {
       setIsChecking(false);
     }

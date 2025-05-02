@@ -67,7 +67,6 @@ export default function WalletTransactions() {
         setError(null);
       } catch (err) {
         setError('Failed to load transaction history. Please try again.');
-        console.error('Error fetching transactions:', err);
       } finally {
         setIsLoading(false);
       }

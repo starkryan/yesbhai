@@ -217,7 +217,7 @@ export default function Users({ users, filters }: UsersPageProps) {
         window.location.reload();
       }
     } catch (error) {
-      console.error('Error updating balance:', error);
+      // console.error('Error updating balance:', error);
       toast.error('Failed to update balance');
     } finally {
       setIsSubmitting(false);
