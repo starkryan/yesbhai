@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Models\OtpPurchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -112,6 +113,71 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update balance: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user details by ID.
+     */
+    public function getUserDetails($userId)
+    {
+        try {
+            $user = User::findOrFail($userId);
+            return response()->json([
+                'success' => true,
+                'user' => $user
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch user details: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user's OTP purchases.
+     */
+    public function getUserPurchases($userId)
+    {
+        try {
+            $user = User::findOrFail($userId);
+            $purchases = OtpPurchase::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+                
+            return response()->json([
+                'success' => true,
+                'purchases' => $purchases
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch user purchases: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user's wallet transactions.
+     */
+    public function getUserTransactions($userId)
+    {
+        try {
+            $user = User::findOrFail($userId);
+            $transactions = WalletTransaction::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+                
+            return response()->json([
+                'success' => true,
+                'transactions' => $transactions
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch user transactions: ' . $e->getMessage()
             ], 500);
         }
     }

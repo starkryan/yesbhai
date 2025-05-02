@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Head, useForm as useInertiaForm } from '@inertiajs/react';
+import { Head, useForm as useInertiaForm, Link } from '@inertiajs/react';
 import { router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -48,7 +48,7 @@ import { Button } from '@/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Loader2, Plus, Minus, Search, Menu, MoreVertical, UserCircle, Wallet } from 'lucide-react';
+import { Loader2, Plus, Minus, Search, Menu, MoreVertical, UserCircle, Wallet, PlusCircle, Eye } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
@@ -387,13 +387,26 @@ export default function Users({ users, filters }: UsersPageProps) {
                         </TableCell>
                         <TableCell>{formatDate(user.created_at)}</TableCell>
                         <TableCell>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleManageBalance(user)}
-                          >
-                            Manage Balance
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleManageBalance(user)}
+                            >
+                              <PlusCircle className="h-4 w-4 mr-1" />
+                              <span>Add Balance</span>
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              asChild
+                            >
+                              <Link href={`/admin/users/${user.id}`}>
+                                <Eye className="h-4 w-4 mr-1" />
+                                <span>View Details</span>
+                              </Link>
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

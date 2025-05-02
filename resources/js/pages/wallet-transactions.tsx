@@ -165,7 +165,7 @@ export default function WalletTransactions() {
           
           <Card className="md:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Reserved Balance</CardTitle>
+              <CardTitle className="text-base">Reserved Amount</CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -189,7 +189,7 @@ export default function WalletTransactions() {
           
           <Card className="md:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Total Recharge</CardTitle>
+              <CardTitle className="text-base">Total Balance</CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (

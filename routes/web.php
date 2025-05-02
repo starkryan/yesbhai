@@ -65,11 +65,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Admin Routes
     Route::middleware([AdminMiddleware::class])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/users', [AdminUserController::class, 'index'])->name('users');
+        Route::get('/users/{userId}', function ($userId) {
+            return Inertia::render('Admin/UserDetails', [
+                'userId' => $userId,
+            ]);
+        })->name('users.details');
     });
 
     // Admin API Routes
     Route::middleware(['auth', 'verified', AdminMiddleware::class])->group(function () {
         Route::post('/api/admin/users/{user}/balance', [AdminUserController::class, 'updateBalance'])->name('admin.users.update-balance');
+        Route::get('/api/admin/users/{userId}', [AdminUserController::class, 'getUserDetails'])->name('admin.users.get');
+        Route::get('/api/admin/users/{userId}/purchases', [AdminUserController::class, 'getUserPurchases'])->name('admin.users.purchases');
+        Route::get('/api/admin/users/{userId}/transactions', [AdminUserController::class, 'getUserTransactions'])->name('admin.users.transactions');
     });
 });
 
