@@ -360,9 +360,9 @@ export default function Users({ users, filters }: UsersPageProps) {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Wallet Balance</TableHead>
-                    <TableHead>Reserved Balance</TableHead>
+                    <TableHead className="hidden lg:table-cell">Reserved Balance</TableHead>
                     <TableHead>Available Balance</TableHead>
-                    <TableHead>Created On</TableHead>
+                    <TableHead className="hidden lg:table-cell">Created On</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -381,11 +381,11 @@ export default function Users({ users, filters }: UsersPageProps) {
                           )}
                         </TableCell>
                         <TableCell>₹{parseFloat(user.wallet_balance).toFixed(2)}</TableCell>
-                        <TableCell>₹{parseFloat(user.reserved_balance).toFixed(2)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">₹{parseFloat(user.reserved_balance).toFixed(2)}</TableCell>
                         <TableCell>
                           ₹{(parseFloat(user.wallet_balance) - parseFloat(user.reserved_balance)).toFixed(2)}
                         </TableCell>
-                        <TableCell>{formatDate(user.created_at)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{formatDate(user.created_at)}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -437,7 +437,7 @@ export default function Users({ users, filters }: UsersPageProps) {
                     Previous
                   </Button>
                   
-                  <div className="hidden sm:flex items-center space-x-1">
+                  <div className="hidden sm:flex items-center space-x-1 flex-wrap justify-center">
                     {users.links && Array.from({ length: users.last_page }, (_, i) => i + 1).map((page) => (
                       <Button
                         key={page}

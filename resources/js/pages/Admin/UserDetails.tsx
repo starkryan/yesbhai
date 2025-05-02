@@ -306,8 +306,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
         </div>
 
         {/* User Profile Overview Card */}
-        <div className="grid gap-6 md:grid-cols-4">
-          <Card className="md:col-span-1">
+        <div className="grid gap-6 lg:grid-cols-4">
+          <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle className="text-xl">Profile</CardTitle>
             </CardHeader>
@@ -330,14 +330,14 @@ export default function UserDetails({ userId }: UserDetailsProps) {
           </Card>
 
           {/* Wallet Overview Card */}
-          <Card className="md:col-span-3">
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle className="text-xl">Wallet Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 flex-shrink-0">
                     <Wallet className="h-7 w-7 text-primary" />
                   </div>
                   <div>
@@ -346,7 +346,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 flex-shrink-0">
                     <CreditCard className="h-7 w-7 text-green-600" />
                   </div>
                   <div>
@@ -355,7 +355,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-100 flex-shrink-0">
                     <Clock className="h-7 w-7 text-yellow-600" />
                   </div>
                   <div>
@@ -366,7 +366,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
               </div>
 
               {stats && (
-                <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                     <p className="text-sm text-gray-500">Total Recharged</p>
                     <p className="text-xl font-bold text-green-600">₹{stats.total_recharged.toFixed(2)}</p>
@@ -398,7 +398,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-4 flex-shrink-0">
                     <ShoppingCart className="h-6 w-6 text-blue-600" />
                   </div>
                   <h3 className="text-3xl font-bold mb-1">{stats.total_purchases}</h3>
@@ -406,10 +406,10 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                 </div>
                 
                 <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mb-4 flex-shrink-0">
                     <CheckCircle className="h-6 w-6 text-green-600" />
                   </div>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center flex-wrap justify-center gap-2 mb-1">
                     <h3 className="text-3xl font-bold">{stats.completed_purchases}</h3>
                     <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
                       {stats.purchase_success_rate.toFixed(0)}%
@@ -419,7 +419,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                 </div>
                 
                 <div className="flex flex-col items-center p-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-4 flex-shrink-0">
                     <XCircle className="h-6 w-6 text-red-600" />
                   </div>
                   <h3 className="text-3xl font-bold mb-1">{stats.cancelled_purchases}</h3>
@@ -427,7 +427,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                   <p className="text-sm text-gray-500 mb-1">Most Used Service</p>
                   <p className="text-lg font-bold">{stats.most_used_service}</p>
@@ -456,7 +456,7 @@ export default function UserDetails({ userId }: UserDetailsProps) {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="all">
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 h-auto">
                 <TabsTrigger value="all">All Transactions</TabsTrigger>
                 <TabsTrigger value="otp">OTP Purchases</TabsTrigger>
                 <TabsTrigger value="recharge">Recharges</TabsTrigger>
@@ -475,8 +475,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                           <TableHead>Amount</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Date</TableHead>
+                          <TableHead className="hidden md:table-cell">Reference</TableHead>
+                          <TableHead className="hidden sm:table-cell">Date</TableHead>
                           <TableHead>Description</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -491,9 +491,9 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                             </TableCell>
                             <TableCell>{getTransactionTypeBadge(transaction.transaction_type, transaction.amount)}</TableCell>
                             <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                            <TableCell className="font-mono text-xs">{transaction.reference_id || '-'}</TableCell>
-                            <TableCell>{formatDate(transaction.created_at)}</TableCell>
-                            <TableCell>{transaction.description}</TableCell>
+                            <TableCell className="font-mono text-xs hidden md:table-cell">{transaction.reference_id || '-'}</TableCell>
+                            <TableCell className="hidden sm:table-cell">{formatDate(transaction.created_at)}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{transaction.description}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -512,11 +512,11 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                         <TableRow>
                           <TableHead>Order ID</TableHead>
                           <TableHead>Service</TableHead>
-                          <TableHead>Phone Number</TableHead>
+                          <TableHead className="hidden sm:table-cell">Phone Number</TableHead>
                           <TableHead>Price</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Verification Code</TableHead>
+                          <TableHead className="hidden md:table-cell">Date</TableHead>
+                          <TableHead className="hidden lg:table-cell">Verification Code</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -524,11 +524,11 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                           <TableRow key={purchase.id}>
                             <TableCell className="font-mono text-xs">{purchase.order_id}</TableCell>
                             <TableCell>{purchase.service_name}</TableCell>
-                            <TableCell className="font-mono text-xs">{purchase.phone_number}</TableCell>
+                            <TableCell className="font-mono text-xs hidden sm:table-cell">{purchase.phone_number}</TableCell>
                             <TableCell>₹{parseFloat(purchase.price).toFixed(2)}</TableCell>
                             <TableCell>{getStatusBadge(purchase.status)}</TableCell>
-                            <TableCell>{formatDate(purchase.created_at)}</TableCell>
-                            <TableCell className="font-mono text-xs">{purchase.verification_code || '-'}</TableCell>
+                            <TableCell className="hidden md:table-cell">{formatDate(purchase.created_at)}</TableCell>
+                            <TableCell className="font-mono text-xs hidden lg:table-cell">{purchase.verification_code || '-'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -548,8 +548,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                           <TableHead>ID</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Date</TableHead>
+                          <TableHead className="hidden md:table-cell">Reference</TableHead>
+                          <TableHead className="hidden sm:table-cell">Date</TableHead>
                           <TableHead>Description</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -563,8 +563,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                                 ₹{parseFloat(transaction.amount).toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                              <TableCell className="font-mono text-xs">{transaction.reference_id || '-'}</TableCell>
-                              <TableCell>{formatDate(transaction.created_at)}</TableCell>
+                              <TableCell className="font-mono text-xs hidden md:table-cell">{transaction.reference_id || '-'}</TableCell>
+                              <TableCell className="hidden sm:table-cell">{formatDate(transaction.created_at)}</TableCell>
                               <TableCell>{transaction.description}</TableCell>
                             </TableRow>
                           ))}
@@ -585,8 +585,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                           <TableHead>ID</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Date</TableHead>
+                          <TableHead className="hidden md:table-cell">Reference</TableHead>
+                          <TableHead className="hidden sm:table-cell">Date</TableHead>
                           <TableHead>Description</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -600,8 +600,8 @@ export default function UserDetails({ userId }: UserDetailsProps) {
                                 ₹{parseFloat(transaction.amount).toFixed(2)}
                               </TableCell>
                               <TableCell>{getStatusBadge(transaction.status)}</TableCell>
-                              <TableCell className="font-mono text-xs">{transaction.reference_id || '-'}</TableCell>
-                              <TableCell>{formatDate(transaction.created_at)}</TableCell>
+                              <TableCell className="font-mono text-xs hidden md:table-cell">{transaction.reference_id || '-'}</TableCell>
+                              <TableCell className="hidden sm:table-cell">{formatDate(transaction.created_at)}</TableCell>
                               <TableCell>{transaction.description}</TableCell>
                             </TableRow>
                           ))}
