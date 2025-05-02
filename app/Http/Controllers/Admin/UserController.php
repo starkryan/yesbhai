@@ -9,6 +9,7 @@ use App\Models\OtpPurchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -178,6 +179,49 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch user transactions: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a user account.
+     */
+    public function destroy(Request $request, User $user)
+    {
+        // Optional: Prevent deleting the currently logged-in admin
+        if ($request->user()->id === $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot delete your own account.',
+            ], 403);
+        }
+        
+        // Optional: Prevent deleting the last admin user
+        if ($user->isAdmin()) {
+            $adminCount = User::where('role', 'admin')->count();
+            if ($adminCount <= 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete the last admin account.',
+                ], 400);
+            }
+        }
+
+        try {
+            // Attempt to delete the user
+            // Note: Ensure database foreign key constraints are set up 
+            // correctly (e.g., ON DELETE CASCADE) or handle related data manually if needed.
+            $user->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'User deleted successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to delete user: ' . $e->getMessage(), ['user_id' => $user->id]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete user. Please check the logs.',
             ], 500);
         }
     }

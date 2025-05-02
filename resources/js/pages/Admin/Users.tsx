@@ -48,7 +48,7 @@ import { Button } from '@/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Loader2, Plus, Minus, Search, Menu, MoreVertical, UserCircle, Wallet, PlusCircle, Eye } from 'lucide-react';
+import { Loader2, Plus, Minus, Search, Menu, MoreVertical, UserCircle, Wallet, PlusCircle, Eye, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { debounce } from 'lodash';
@@ -58,6 +58,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface User {
   id: number;
@@ -143,6 +153,8 @@ export default function Users({ users, filters }: UsersPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const [perPage, setPerPage] = useState(filters.perPage.toString());
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data, setData, get } = useInertiaForm({
     search: filters.search,
@@ -200,6 +212,34 @@ export default function Users({ users, filters }: UsersPageProps) {
       type: 'add',
       description: `Admin adjustment for ${user.name}`,
     });
+  };
+
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await axios.delete(`/api/admin/users/${userToDelete.id}`);
+      
+      if (response.data.success) {
+        toast.success('User deleted successfully');
+        setUserToDelete(null);
+        setIsDeleteDialogOpen(false);
+        // Refresh the user list efficiently
+        router.reload({ only: ['users'] });
+      } else {
+        toast.error(response.data.message || 'Failed to delete user.');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'An error occurred while deleting the user.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -275,15 +315,35 @@ export default function Users({ users, filters }: UsersPageProps) {
       </div>
       
       <div className="mt-3 flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => handleManageBalance(user)}
-          className="w-full"
-        >
-          <Wallet className="h-4 w-4 mr-2" />
-          Manage Balance
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleManageBalance(user)}
+            className="w-full"
+          >
+            <PlusCircle className="h-4 w-4 mr-1" />
+            <span>Add/Deduct Balance</span>
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            asChild
+          >
+            <Link href={`/admin/users/${user.id}`}>
+              <Eye className="h-4 w-4 mr-1" />
+              <span>View Details</span>
+            </Link>
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleDeleteClick(user)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            <span>Delete</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -387,14 +447,14 @@ export default function Users({ users, filters }: UsersPageProps) {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">{formatDate(user.created_at)}</TableCell>
                         <TableCell>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleManageBalance(user)}
                             >
                               <PlusCircle className="h-4 w-4 mr-1" />
-                              <span>Add Balance</span>
+                              <span>Add/Deduct Balance</span>
                             </Button>
                             <Button
                               variant="secondary"
@@ -405,6 +465,14 @@ export default function Users({ users, filters }: UsersPageProps) {
                                 <Eye className="h-4 w-4 mr-1" />
                                 <span>View Details</span>
                               </Link>
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteClick(user)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              <span>Delete</span>
                             </Button>
                           </div>
                         </TableCell>
@@ -595,6 +663,30 @@ export default function Users({ users, filters }: UsersPageProps) {
           )}
         </DialogContent>
       </Dialog>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the user 
+              <span className="font-medium">{userToDelete?.name}</span> ({userToDelete?.email}) 
+              and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUserToDelete(null)} disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              disabled={isSubmitting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} 
+              Yes, delete user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 } 

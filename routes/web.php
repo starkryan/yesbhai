@@ -78,6 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/api/admin/users/{userId}', [AdminUserController::class, 'getUserDetails'])->name('admin.users.get');
         Route::get('/api/admin/users/{userId}/purchases', [AdminUserController::class, 'getUserPurchases'])->name('admin.users.purchases');
         Route::get('/api/admin/users/{userId}/transactions', [AdminUserController::class, 'getUserTransactions'])->name('admin.users.transactions');
+        Route::delete('/api/admin/users/{user}', [AdminUserController::class, 'destroy'])->name('admin.users.destroy');
     });
 });
 
